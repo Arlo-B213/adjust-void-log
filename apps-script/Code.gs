@@ -55,6 +55,28 @@ function doPost(e) {
   }
 }
 
+/**
+ * Run this once from the editor (select testSetup, then click Run).
+ * It asks Google for the permissions the reader needs and checks your settings.
+ * Open View > Logs (or Execution log) to see the result.
+ */
+function testSetup() {
+  const props = PropertiesService.getScriptProperties();
+  const key = props.getProperty('ANTHROPIC_API_KEY') || '';
+  Logger.log('API key present: ' + (key ? 'yes, starts with ' + key.slice(0, 10) : 'NO - add ANTHROPIC_API_KEY'));
+  Logger.log('Manager passcode set: ' + (props.getProperty('MANAGER_PASSCODE') ? 'yes' : 'NO'));
+  Logger.log('Admin passcode set: ' + (props.getProperty('ADMIN_PASSCODE') ? 'yes' : 'NO'));
+  const res = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    payload: JSON.stringify({ model: MODEL, max_tokens: 20, messages: [{ role: 'user', content: 'Reply with the word ready.' }] }),
+    muteHttpExceptions: true
+  });
+  Logger.log('Claude answered with status ' + res.getResponseCode() + ': ' + res.getContentText().slice(0, 300));
+  Logger.log(res.getResponseCode() === 200 ? 'ALL GOOD - now deploy a new version.' : 'Fix the problem above, then run testSetup again.');
+}
+
 // Lets you confirm the deployment URL works by opening it in a browser.
 function doGet() {
   return reply({ ok: true, service: 'Adjust & Void Log photo reader' });

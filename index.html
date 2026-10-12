@@ -265,7 +265,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="config.js"></script>
+<script>document.write('<script src="config.js?v='+Date.now()+'"><\/script>')</script>
 <script>
 const OUTLETS=["Agave","American Classics","Café Cocoa's","Little Wok","Pechanga Fried Chicken","Pronto","Portable Smart Bar"];
 const TYPES=["Manager Adjust","Void","Comp","Discount","Refund"];
@@ -667,7 +667,11 @@ const toB64=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res
 async function readViaScript(prompt,blob){
   let res;
   try{res=await fetch(CONFIG.photoReaderUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({key:passcode,prompt,image:await toB64(blob)})})}
-  catch(e){throw new Error("network: "+(e.message||e))}
+  catch(e){
+    let reach="";
+    try{const g=await fetch(CONFIG.photoReaderUrl);const t=await g.text();reach=/"ok":true/.test(t)?" (the reader answers simple checks, so the script is crashing on photos: run testSetup in Apps Script, then deploy a new version)":" (the reader isn't answering at all: check the deployment is set to Anyone)"}catch(e2){reach=" (the reader isn't answering at all: check the deployment is set to Anyone)"}
+    throw new Error("network: "+(e.message||e)+reach)
+  }
   const text=await res.text();let j;
   try{j=JSON.parse(text)}catch(e){throw new Error("not_json: "+text.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0,120))}
   if(j.error)throw new Error(j.error);
