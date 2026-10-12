@@ -15,5 +15,5 @@ window.CONFIG = {
   adminPasscodeHash: "85ce990e5e9ce868b573df041c8d7430fed5bbdb92b14bd486c8a34f88904cf1",
 
   // Cloudflare Worker URL for the photo reader (ends in .workers.dev). Leave empty to skip automatic photo reading.
-  photoReaderUrl: ""
+  photoReaderUrl: "https://adjust-void-reader.arlo-bedolla.workers.dev/"
 };
