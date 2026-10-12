@@ -2,15 +2,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Log entries: anyone with the app can read and add; entries can't be edited after logging.
+    // Log entries: anyone with the app can read, add and edit.
     match /adjustments/{id} {
       allow read: if true;
-      allow create: if request.resource.data.keys().hasAll(['when', 'outlet', 'check', 'amount'])
-                    && request.resource.data.amount is number
-                    && request.resource.data.amount >= 0
-                    && request.resource.data.amount < 10000
-                    && request.resource.data.size() <= 20;
-      allow update: if false;
+      allow create, update: if request.resource.data.keys().hasAll(['when', 'outlet', 'check', 'amount'])
+                            && request.resource.data.amount is number
+                            && request.resource.data.amount >= 0
+                            && request.resource.data.amount < 10000
+                            && request.resource.data.size() <= 20;
+      allow delete: if true;
+    }
+
+    // Receipt photos: one per entry, stored under the entry's id. Fetched one at a time, never listed.
+    match /photos/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if request.resource.data.data is string
+                            && request.resource.data.data.size() < 1000000;
       allow delete: if true;
     }
 

@@ -99,6 +99,12 @@ td.num,th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:ta
 .or{grid-column:1/-1;display:flex;align-items:center;gap:10px;font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .or::before,.or::after{content:"";flex:1;border-top:1px solid var(--line)}
 a.ph{color:var(--accent);font-size:12px}
+.viewer{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.92);display:grid;grid-template-rows:auto minmax(0,1fr);padding:calc(10px + env(safe-area-inset-top,0px)) 12px calc(12px + env(safe-area-inset-bottom,0px))}
+.viewer-bar{display:flex;justify-content:space-between;align-items:center;gap:12px;color:#fff;padding:4px 4px 10px;font-size:14px}
+.viewer-bar .linkbtn{color:#fff;font-size:16px}
+.viewer img{width:100%;height:100%;object-fit:contain;min-height:0}
+.acts-cell{display:flex;flex-direction:column;gap:6px;align-items:flex-start;white-space:nowrap}
+.editing-banner{grid-column:1/-1;background:var(--accent-soft);border:1px solid var(--accent);border-radius:6px;padding:8px 12px;font-size:13px}
 .cam{position:fixed;inset:0;z-index:50;background:#000;display:grid;grid-template-rows:minmax(0,1fr) auto}
 .cam video{width:100%;height:100%;object-fit:contain;background:#000;min-height:0}
 .cam-guide{position:absolute;inset:8% 14% calc(8% + 120px);border:2px dashed rgba(255,255,255,.55);border-radius:10px;pointer-events:none}
@@ -167,6 +173,11 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
   </div>
 </div>
 
+<div class="viewer" id="viewer" hidden role="dialog" aria-label="Receipt photo">
+  <div class="viewer-bar"><span id="viewer-title">Receipt</span><button type="button" class="linkbtn" id="viewer-close">Close</button></div>
+  <img id="viewer-img" alt="Receipt photo">
+</div>
+
 <div class="wrap" id="app" hidden>
   <header>
     <div>
@@ -197,7 +208,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
       <form class="form" id="entry" novalidate>
         <div class="snap" id="snap">
           <div class="ico" id="snap-thumb">RECEIPT</div>
-          <div class="snap-txt"><b id="snap-title">Snap the receipt</b><span id="snap-msg">Take a photo or upload one. The form fills itself in; you check it and tap Log. Photos are only used to read the receipt and are never saved.</span></div>
+          <div class="snap-txt"><b id="snap-title">Snap the receipt</b><span id="snap-msg">Take a photo or upload one. The form fills itself in; you check it and tap Log. The photo is saved with the entry.</span></div>
           <div class="snap-btns">
             <button type="button" class="btn snap-btn" id="take-photo">Take photo</button>
             <label class="btn ghost snap-btn" for="e-photo">Upload photo</label>
@@ -205,6 +216,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
           <input type="file" id="e-cam" accept="image/*" capture="environment" class="vh" tabindex="-1">
           <input type="file" id="e-photo" accept="image/*" class="vh" tabindex="-1">
         </div>
+        <div class="editing-banner" id="edit-banner" hidden></div>
         <div class="or">check the details</div>
         <label>Outlet<select id="e-outlet" required></select></label>
         <label>Type<select id="e-type" required></select></label>
@@ -219,6 +231,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
         <label class="full">Notes <small>optional</small><textarea id="e-notes" placeholder="What happened, what the guest was told"></textarea></label>
         <div class="row-actions full">
           <button class="btn" type="submit" id="e-save">Log entry</button>
+          <button class="btn ghost" type="button" id="e-cancel" hidden>Cancel edit</button>
           <span class="status" id="e-status" role="status"></span>
         </div>
       </form>
@@ -337,12 +350,16 @@ function render(){
     <td>${esc(r.outlet)}</td>
     <td class="mono">${esc(r.check)}</td>
     <td>${esc(r.server)}</td>
-    <td>${esc(r.item)}${r.notes?`<div class="note">${esc(r.notes)}</div>`:""}</td>
+    <td>${esc(r.item)}${r.notes?`<div class="note">${esc(r.notes)}</div>`:""}${r.editedAt?`<div class="note">Edited ${esc(new Date(r.editedAt).toLocaleDateString(undefined,{month:"short",day:"numeric"}))}</div>`:""}</td>
     <td><span class="pill ${r.type==="Void"?"void":r.type==="Manager Adjust"?"adj":""}">${esc(r.type)}</span></td>
     <td>${esc(r.reason)}</td>
     <td class="num">${money(r.amount)}</td>
     <td>${esc(r.approvedBy)}${r.mgrBadge?`<div class="note mono">#${esc(r.mgrBadge)}</div>`:""}</td>
-    <td>${role==="admin"?`<button class="del ${pendingDel===r.id?"confirm":""}" data-id="${esc(r.id)}">${pendingDel===r.id?"Confirm delete":"Delete"}</button>`:""}</td>
+    <td><div class="acts-cell">
+      ${r.hasPhoto?`<button type="button" class="linkbtn" data-photo="${esc(r.id)}">Receipt</button>`:""}
+      <button type="button" class="linkbtn" data-edit="${esc(r.id)}">Edit</button>
+      ${role==="admin"?`<button class="del ${pendingDel===r.id?"confirm":""}" data-id="${esc(r.id)}">${pendingDel===r.id?"Confirm delete":"Delete"}</button>`:""}
+    </div></td>
   </tr>`).join("");
 }
 ["f-range","f-outlet","f-reason"].forEach(id=>$(id).addEventListener("change",()=>{if(id==="f-range"){try{localStorage.setItem("avl-range2",$("f-range").value)}catch(e){}}render()}));
@@ -352,8 +369,58 @@ $("log").addEventListener("click",async e=>{
   const id=b.dataset.id;
   if(pendingDel!==id){pendingDel=id;render();setTimeout(()=>{if(pendingDel===id){pendingDel=null;render()}},4000);return}
   pendingDel=null;
-  try{const r=rows.find(x=>x.id===id);await db.collection("adjustments").doc(id).delete();}catch(err){status("Couldn't delete that entry. Try again in a moment.","err")}
+  try{const r=rows.find(x=>x.id===id);await db.collection("adjustments").doc(id).delete();if(r&&r.hasPhoto)db.collection("photos").doc(id).delete().catch(()=>{});if(editingId===id)cancelEdit()}catch(err){status("Couldn't delete that entry. Try again in a moment.","err")}
 });
+
+/* ---------- Receipt photos ---------- */
+const photoCache=new Map();
+async function loadPhoto(id){
+  if(photoCache.has(id))return photoCache.get(id);
+  const sn=await db.collection("photos").doc(id).get();
+  const d=sn.exists?sn.data().data:null;
+  if(d)photoCache.set(id,d);
+  return d;
+}
+$("log").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-photo]");if(!b)return;
+  const r=rows.find(x=>x.id===b.dataset.photo);
+  $("viewer-title").textContent=r?`Check ${r.check} · ${r.outlet}`:"Receipt";
+  $("viewer-img").removeAttribute("src");$("viewer").hidden=false;document.body.style.overflow="hidden";
+  try{const d=await loadPhoto(b.dataset.photo);if(d)$("viewer-img").src=d;else{closeViewer();status("That receipt photo couldn't be found.","err")}}
+  catch(err){closeViewer();status("Couldn't open the receipt photo. Try again.","err")}
+});
+function closeViewer(){$("viewer").hidden=true;$("viewer-img").removeAttribute("src");document.body.style.overflow=""}
+$("viewer-close").addEventListener("click",closeViewer);
+$("viewer").addEventListener("click",e=>{if(e.target.id==="viewer")closeViewer()});
+
+/* ---------- Editing ---------- */
+let editingId=null;
+function fillForm(r){
+  $("e-outlet").value=r.outlet||OUTLETS[0];$("e-type").value=r.type||TYPES[0];$("e-check").value=r.check||"";
+  $("e-when").value=String(r.when||"").slice(0,16);$("e-server").value=r.server||"";$("e-item").value=r.item||"";
+  $("e-amount").value=r.amount!=null?Number(r.amount).toFixed(2):"";$("e-reason").value=REASONS.includes(r.reason)?r.reason:"Other";
+  $("e-mgr").value=r.approvedBy||"";$("e-mgrbadge").value=r.mgrBadge||"";$("e-notes").value=r.notes||"";
+}
+async function startEdit(id){
+  const r=rows.find(x=>x.id===id);if(!r)return;
+  editingId=id;resetSnap();fillForm(r);
+  $("h-new").textContent="Edit entry";$("e-save").textContent="Save changes";$("e-cancel").hidden=false;
+  $("edit-banner").hidden=false;$("edit-banner").textContent=`Editing check ${r.check} at ${r.outlet}. Change any field, then tap Save changes.`;
+  snapState(r.hasPhoto?"Receipt on file":"No receipt photo yet",r.hasPhoto?"Take or upload a new photo to replace it. Your edits below won't be overwritten.":"Take or upload a photo to add it to this entry.");
+  status("");
+  $("h-new").scrollIntoView({behavior:"smooth",block:"start"});
+  if(r.hasPhoto){try{const d=await loadPhoto(id);if(d&&editingId===id&&!photoBlob)$("snap-thumb").innerHTML=`<img alt="Receipt photo" src="${d}">`}catch(e){}}
+}
+function cancelEdit(){
+  editingId=null;
+  $("h-new").textContent="New entry";$("e-save").textContent="Log entry";$("e-cancel").hidden=true;$("edit-banner").hidden=true;
+  ["e-check","e-server","e-item","e-amount","e-notes"].forEach(id=>$(id).value="");
+  $("e-when").value=nowLocal();
+  try{const m=localStorage.getItem("avl-mgr");$("e-mgr").value=m||"";const mb=localStorage.getItem("avl-mgrbadge");$("e-mgrbadge").value=mb||""}catch(e){}
+  resetSnap();
+}
+$("log").addEventListener("click",e=>{const b=e.target.closest("[data-edit]");if(b)startEdit(b.dataset.edit)});
+$("e-cancel").addEventListener("click",()=>{cancelEdit();status("Edit canceled.")});
 
 
 function status(msg,cls){const s=$("e-status");s.textContent=msg;s.className="status "+(cls||"")}
@@ -365,14 +432,40 @@ $("entry").addEventListener("submit",async e=>{
   const missing=[["e-check","check #"],["e-when","date & time"],["e-server","team member"],["e-item","item"],["e-mgr","approving manager"]].filter(([id])=>!v(id)).map(x=>x[1]);
   if(!(amount>0))missing.push("amount");
   if(missing.length){status("Add the "+missing.join(", ")+" to log this entry.","err");return}
-  const doc={when:v("e-when"),outlet:v("e-outlet"),type:v("e-type"),check:v("e-check"),server:v("e-server").replace(/^\d+\s*/,""),item:v("e-item"),amount:Math.round(amount*100)/100,reason:v("e-reason"),approvedBy:v("e-mgr"),mgrBadge:v("e-mgrbadge").replace(/\D/g,""),notes:v("e-notes"),loggedBy:role,createdAt:new Date().toISOString()};
+  const doc={when:v("e-when"),outlet:v("e-outlet"),type:v("e-type"),check:v("e-check"),server:v("e-server").replace(/^\d+\s*/,""),item:v("e-item"),amount:Math.round(amount*100)/100,reason:v("e-reason"),approvedBy:v("e-mgr"),mgrBadge:v("e-mgrbadge").replace(/\D/g,""),notes:v("e-notes")};
+  if(editingId){
+    const id=editingId;
+    $("e-save").disabled=true;
+    try{
+      let photoNote="";
+      if(photoData){
+        status("Saving photo…");
+        try{await db.collection("photos").doc(id).set({data:photoData,createdAt:new Date().toISOString()});photoCache.set(id,photoData);doc.hasPhoto=true}
+        catch(e){photoNote=" The new photo couldn't be saved."}
+      }
+      status("Saving changes…");
+      await db.collection("adjustments").doc(id).update({...doc,editedAt:new Date().toISOString(),editedBy:role});
+      cancelEdit();
+      status(`Updated check ${doc.check} · ${money(doc.amount)}.${photoNote}`,photoNote?"err":"ok");
+    }catch(err){
+      if(err&&err.code==="permission-denied")status("The database refused the change. The Firestore rules need updating to allow edits (see the setup guide).","err");
+      else status("Couldn't save changes"+(err&&err.code?` (${err.code})`:"")+". Check your connection and try again.","err");
+    }finally{$("e-save").disabled=false}
+    return;
+  }
+  doc.loggedBy=role;doc.createdAt=new Date().toISOString();
   if(!confirmDup&&rows.some(r=>r.check===doc.check&&r.outlet===doc.outlet)){confirmDup=true;status(`Check ${doc.check} at ${doc.outlet} is already logged. Tap Log entry again to add it anyway.`,"err");return}
   confirmDup=false;
   try{localStorage.setItem("avl-mgr",doc.approvedBy);localStorage.setItem("avl-mgrbadge",doc.mgrBadge)}catch(e){}
   $("e-save").disabled=true;
   try{
     const ref=db.collection("adjustments").doc();
-    const photoNote="";
+    let photoNote="";
+    if(photoData){
+      status("Saving photo…");
+      try{await db.collection("photos").doc(ref.id).set({data:photoData,createdAt:doc.createdAt});photoCache.set(ref.id,photoData);doc.hasPhoto=true}
+      catch(e){photoNote=" The photo couldn't be saved, but the entry was."}
+    }
     status("Saving entry…");
     await ref.set(doc);
     const mk=doc.when.slice(0,7), sel=$("f-range");
@@ -389,11 +482,11 @@ $("entry").addEventListener("submit",async e=>{
   }finally{$("e-save").disabled=!canWrite}
 });
 
-let photoBlob=null, thumbUrl="", confirmDup=false;
+let photoBlob=null, photoData="", thumbUrl="", confirmDup=false;
 try{const m=localStorage.getItem("avl-mgr");if(m)$("e-mgr").value=m;const mb=localStorage.getItem("avl-mgrbadge");if(mb)$("e-mgrbadge").value=mb}catch(e){}
 
 function snapState(title,msg){$("snap-title").textContent=title;$("snap-msg").textContent=msg}
-function resetSnap(){photoBlob=null;if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=""}$("snap-thumb").textContent="RECEIPT";snapState("Snap the next receipt","Take a photo or upload one. The form fills itself in; you check it and tap Log. Photos are never saved.")}
+function resetSnap(){photoBlob=null;photoData="";if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=""}$("snap-thumb").textContent="RECEIPT";snapState("Snap the next receipt","Take a photo or upload one. The form fills itself in; you check it and tap Log. The photo is saved with the entry.")}
 /* One small copy of the photo, made once: phone cameras produce 12+ megapixel images,
    so decode once, draw at most 1600px, then free everything to avoid low-memory errors. */
 async function shrink(file){
@@ -407,10 +500,20 @@ async function shrink(file){
     c.getContext("2d").drawImage(img,0,0,c.width,c.height);
     img.src="";img=null;URL.revokeObjectURL(url);
     const blob=await new Promise(res=>c.toBlob(b=>res(b),"image/jpeg",.8));
-    return {blob:blob||file};
+    /* Stored copy: a smaller JPEG that fits in one database record (under ~900 KB). */
+    let data="";
+    for(const [max,q] of [[1400,.62],[1100,.55],[900,.5]]){
+      const k=Math.min(1,max/Math.max(c.width,c.height));
+      let d=document.createElement("canvas");d.width=Math.round(c.width*k);d.height=Math.round(c.height*k);
+      d.getContext("2d").drawImage(c,0,0,d.width,d.height);
+      data=d.toDataURL("image/jpeg",q);d.width=d.height=0;d=null;
+      if(data.length<900000)break;
+      data="";
+    }
+    return {blob:blob||file,data};
   }catch(e){
     URL.revokeObjectURL(url);
-    return {blob:file};
+    return {blob:file,data:""};
   }finally{c.width=0;c.height=0;c=null}
 }
 function setField(id,val){if(val==null||val==="")return;const el=$(id);el.value=val;el.classList.remove("filled");void el.offsetWidth;el.classList.add("filled")}
@@ -418,10 +521,11 @@ async function readReceipt(file){
   if(!file||!/^image\//.test(file.type)){snapState("That isn't a photo","Choose a picture of the receipt (JPG, PNG or HEIC).");return}
   const snap=$("snap");snap.classList.add("busy");
   snapState("Preparing photo…","One moment.");
-  const sh=await shrink(file);photoBlob=sh.blob;
+  const sh=await shrink(file);photoBlob=sh.blob;photoData=sh.data;
   if(thumbUrl)URL.revokeObjectURL(thumbUrl);
   thumbUrl=URL.createObjectURL(photoBlob);$("snap-thumb").innerHTML=`<img alt="Receipt photo" src="${thumbUrl}">`;
-  if(!CONFIG.photoReaderUrl){snapState("Photo ready","Automatic reading isn't turned on yet. Fill in the details below, then tap Log entry. The photo isn't saved.");snap.classList.remove("busy");return}
+  if(editingId){snapState("New photo attached","It will replace the receipt photo when you tap Save changes.");snap.classList.remove("busy");return}
+  if(!CONFIG.photoReaderUrl){snapState("Photo ready","Automatic reading isn't turned on yet. Fill in the details below, then tap Log entry.");snap.classList.remove("busy");return}
   snapState("Reading receipt…","This takes a few seconds.");
   const prompt=`The image is a photo of a Pechanga Resort Casino food court receipt for a manager adjustment or void. The photo may be rotated sideways or upside down; read it in whatever orientation it is in. It usually has two parts:
 1) The printed POS check: outlet name under "Pechanga Resort Casino" (e.g. "Agave"), a team member line like "20356 Selena M" (number, then first name and last initial), "CHK 20976", the check date and time, item lines like "1 LONG BEACH TEA 14.00", and an adjustment line like "Manager Adjust $14.00", then Subtotal, Tax (sometimes absent), Payment.
@@ -635,20 +739,20 @@ async function buildReport(list){
 
   /* ---------- One log tab per month ---------- */
   const byMonth=new Map();list.forEach(r=>{const k=String(r.when).slice(0,7);if(!byMonth.has(k))byMonth.set(k,[]);byMonth.get(k).push(r)});
-  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Mgr Badge","Notes"];
-  const widths=[12,10,22,10,24,10,18,26,16,20,12,20,11,44];
+  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Mgr Badge","Notes","Photo"];
+  const widths=[12,10,22,10,24,10,18,26,16,20,12,20,11,44,8];
   [...byMonth.keys()].sort().reverse().forEach(k=>{
     const items=byMonth.get(k);
     const w=wb.addWorksheet(monthLabel(k,true),{properties:{tabColor:{argb:NAVY}},views:[{state:"frozen",ySplit:4,showGridLines:false}]});
     w.columns=widths.map(x=>({width:x}));
     w.pageSetup={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:"4:4",margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
-    w.mergeCells("A1:N1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
-    w.mergeCells("A2:N2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
+    w.mergeCells("A1:O1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
+    w.mergeCells("A2:O2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
     const hr=w.getRow(4);head.forEach((x,i)=>{const c=hr.getCell(i+1);c.value=x;c.font={bold:true,color:{argb:WHITE},size:10};c.fill=fillC(GOLD);c.alignment={horizontal:i===10?"right":"left",vertical:"middle"}});hr.height=20;
     items.forEach((r,i)=>{
       const d=new Date(r.when);
       const x=w.getRow(5+i);
-      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.mgrBadge||"",r.notes||""]
+      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.mgrBadge||"",r.notes||"",r.hasPhoto?"Yes":""]
         .forEach((val,j)=>{const c=x.getCell(j+1);c.value=val;c.border={bottom:thin};c.alignment={vertical:"top",wrapText:j===7||j===13,horizontal:j===10?"right":"left"};if(i%2)c.fill=fillC(BAND)});
       x.getCell(1).numFmt="mm/dd/yyyy";x.getCell(11).numFmt=MF;x.getCell(11).font={color:{argb:RED}};
       x.getCell(5).font=r._name?{bold:true,color:{argb:NAVY}}:{italic:true,color:{argb:GREY}};
@@ -657,7 +761,7 @@ async function buildReport(list){
     const last=4+items.length, tr=w.getRow(last+1);
     tr.getCell(10).value="Total";tr.getCell(11).value={formula:`SUM(K5:K${last})`,result:sum(items)};tr.getCell(11).numFmt=MF;
     [10,11].forEach(j=>{const c=tr.getCell(j);c.font={bold:true,color:{argb:NAVY}};c.border={top:{style:"medium",color:{argb:NAVY}}};c.alignment={horizontal:"right"}});
-    w.autoFilter={from:{row:4,column:1},to:{row:last,column:14}};
+    w.autoFilter={from:{row:4,column:1},to:{row:last,column:15}};
   });
   return await wb.xlsx.writeBuffer();
 }
