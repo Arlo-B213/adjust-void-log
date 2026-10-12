@@ -476,7 +476,9 @@ Handwriting can be messy; give your best reading. Use "" for anything you cannot
 let camStream=null;
 function camStop(){if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null}$("cam-video").srcObject=null;$("cam").hidden=true;document.body.style.overflow=""}
 $("take-photo").addEventListener("click",async()=>{
-  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$("e-cam").click();return}
+  // iPhone/iPad: the built-in camera app works reliably there, so use it directly.
+  const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  if(isIOS||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$("e-cam").click();return}
   try{
     camStream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1440}}});
     const v=$("cam-video");v.srcObject=camStream;$("cam").hidden=false;document.body.style.overflow="hidden";
