@@ -614,7 +614,18 @@ $("csv").addEventListener("click",async()=>{
   if(!window.ExcelJS){status("The Excel exporter didn't load. Reload the page and try again.","err");return}
   const list=filtered().slice().sort((a,b)=>String(a.when).localeCompare(String(b.when)));
   if(!list.length)return;
-  const buf=await buildReport(list);
+  const btn=$("csv"), label=btn.textContent;btn.disabled=true;
+  let buf;
+  try{
+    const withPhoto=list.filter(r=>r.hasPhoto);const thumbs={};
+    for(let i=0;i<withPhoto.length;i++){
+      btn.textContent=`Adding receipts ${i+1} of ${withPhoto.length}…`;
+      try{const d=await loadPhoto(withPhoto[i].id);if(d)thumbs[withPhoto[i].id]=await makeThumb(d)}catch(e){}
+    }
+    btn.textContent="Building report…";
+    buf=await buildReport(list,thumbs);
+  }catch(err){status("Couldn't build the report. Try again.","err");return}
+  finally{btn.disabled=false;btn.textContent=label}
   const v=$("f-range").value;
   const name=v.startsWith("m:")?monthLabel(v.slice(2)).replace(" ","-"):v==="fy"?fyLabel():new Date().toISOString().slice(0,10);
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));a.download=`Adjust-Void-Report-${name}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
@@ -678,7 +689,15 @@ function rosterClick(e){
 }
 $("r-list").addEventListener("click",rosterClick);$("r-former").addEventListener("click",rosterClick);
 
-async function buildReport(list){
+/* Small JPEG for the Excel thumbnail (about 10-20 KB each). */
+function makeThumb(dataUrl){
+  return new Promise((res,rej)=>{const img=new Image();img.onload=()=>{
+    const k=Math.min(1,320/Math.max(img.width,img.height));let c=document.createElement("canvas");
+    c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    const out={data:c.toDataURL("image/jpeg",.72),w:c.width,h:c.height};c.width=c.height=0;c=null;res(out)};img.onerror=rej;img.src=dataUrl});
+}
+const receiptLink=id=>location.origin+location.pathname+"#receipt-"+id;
+async function buildReport(list,thumbs={}){
   list=list.map(r=>{const p=matchCashier(r.server);return {...r,_name:p?p.name:"",_badge:p?String(p.badge):"",_who:p?`${p.name} (#${p.badge})`:(r.server||"(blank)")+(roster.length?" · not on roster":""),_mgr:(r.approvedBy||"(not recorded)")+(r.mgrBadge?` (#${r.mgrBadge})`:"")}});
   const NAVY="FF1B2A41",GOLD="FFA8741F",GOLDL="FFF4EAD8",BAND="FFF5F7FA",LINE="FFD9DFE7",RED="FFB3372F",GREY="FF5D6B7E",WHITE="FFFFFFFF",MF='"$"#,##0.00';
   const fillC=a=>({type:"pattern",pattern:"solid",fgColor:{argb:a}});
@@ -739,29 +758,41 @@ async function buildReport(list){
 
   /* ---------- One log tab per month ---------- */
   const byMonth=new Map();list.forEach(r=>{const k=String(r.when).slice(0,7);if(!byMonth.has(k))byMonth.set(k,[]);byMonth.get(k).push(r)});
-  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Mgr Badge","Notes","Photo"];
-  const widths=[12,10,22,10,24,10,18,26,16,20,12,20,11,44,8];
+  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Mgr Badge","Notes","Receipt","Full Photo"];
+  const widths=[12,10,22,10,24,10,18,26,16,20,12,20,11,40,14,14];
   [...byMonth.keys()].sort().reverse().forEach(k=>{
     const items=byMonth.get(k);
     const w=wb.addWorksheet(monthLabel(k,true),{properties:{tabColor:{argb:NAVY}},views:[{state:"frozen",ySplit:4,showGridLines:false}]});
     w.columns=widths.map(x=>({width:x}));
     w.pageSetup={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:"4:4",margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
-    w.mergeCells("A1:O1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
-    w.mergeCells("A2:O2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
+    w.mergeCells("A1:P1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
+    w.mergeCells("A2:P2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
     const hr=w.getRow(4);head.forEach((x,i)=>{const c=hr.getCell(i+1);c.value=x;c.font={bold:true,color:{argb:WHITE},size:10};c.fill=fillC(GOLD);c.alignment={horizontal:i===10?"right":"left",vertical:"middle"}});hr.height=20;
     items.forEach((r,i)=>{
       const d=new Date(r.when);
       const x=w.getRow(5+i);
-      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.mgrBadge||"",r.notes||"",r.hasPhoto?"Yes":""]
+      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.mgrBadge||"",r.notes||"","",""]
         .forEach((val,j)=>{const c=x.getCell(j+1);c.value=val;c.border={bottom:thin};c.alignment={vertical:"top",wrapText:j===7||j===13,horizontal:j===10?"right":"left"};if(i%2)c.fill=fillC(BAND)});
       x.getCell(1).numFmt="mm/dd/yyyy";x.getCell(11).numFmt=MF;x.getCell(11).font={color:{argb:RED}};
       x.getCell(5).font=r._name?{bold:true,color:{argb:NAVY}}:{italic:true,color:{argb:GREY}};
       if(r.type==="Void")x.getCell(9).font={bold:true,color:{argb:RED}};
+      if(r.hasPhoto){
+        const link=receiptLink(r.id), lc=x.getCell(16);
+        lc.value={text:"Open receipt",hyperlink:link,tooltip:"Opens the full photo in the Adjust & Void Log app"};
+        lc.font={color:{argb:"FF1F5FBF"},underline:true};
+        const t=thumbs[r.id];
+        if(t){
+          const hgt=90, wid=Math.round(hgt*t.w/t.h);
+          const imgId=wb.addImage({base64:t.data,extension:"jpeg"});
+          w.addImage(imgId,{tl:{col:14.1,row:4+i+.05},ext:{width:Math.min(wid,95),height:hgt},editAs:"oneCell",hyperlinks:{hyperlink:link,tooltip:"Open full receipt"}});
+          x.height=72;
+        }
+      }else{x.getCell(15).value="No photo";x.getCell(15).font={italic:true,color:{argb:GREY},size:9}}
     });
     const last=4+items.length, tr=w.getRow(last+1);
     tr.getCell(10).value="Total";tr.getCell(11).value={formula:`SUM(K5:K${last})`,result:sum(items)};tr.getCell(11).numFmt=MF;
     [10,11].forEach(j=>{const c=tr.getCell(j);c.font={bold:true,color:{argb:NAVY}};c.border={top:{style:"medium",color:{argb:NAVY}}};c.alignment={horizontal:"right"}});
-    w.autoFilter={from:{row:4,column:1},to:{row:last,column:15}};
+    w.autoFilter={from:{row:4,column:1},to:{row:last,column:16}};
   });
   return await wb.xlsx.writeBuffer();
 }
@@ -808,12 +839,24 @@ $("r-import").addEventListener("change",async e=>{
 let role="manager", passcode="";
 const sha=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,"0")).join("");
 async function roleFor(p){const h=await sha(p);return h===CONFIG.adminPasscodeHash?"admin":h===CONFIG.managerPasscodeHash?"manager":null}
+async function openReceiptFromLink(){
+  const m=location.hash.match(/^#receipt-([A-Za-z0-9_-]+)$/);if(!m)return;
+  history.replaceState(null,"",location.pathname);
+  $("viewer-title").textContent="Receipt";$("viewer-img").removeAttribute("src");$("viewer").hidden=false;document.body.style.overflow="hidden";
+  try{
+    const [d,sn]=await Promise.all([loadPhoto(m[1]),db.collection("adjustments").doc(m[1]).get()]);
+    if(sn.exists){const r=sn.data();$("viewer-title").textContent=`Check ${r.check} · ${r.outlet}`}
+    if(d)$("viewer-img").src=d;else{closeViewer();status("That receipt photo couldn't be found.","err")}
+  }catch(e){closeViewer();status("Couldn't open the receipt photo. Try again.","err")}
+}
+window.addEventListener("hashchange",()=>{if(db)openReceiptFromLink()});
 function start(){
   $("lock").hidden=true;$("app").hidden=false;
   $("who-role").textContent=role==="admin"?"Admin":"Manager";
   try{firebase.app()}catch(e){firebase.initializeApp(CONFIG.firebase)}
   db=firebase.firestore();
   render();
+  openReceiptFromLink();
   db.collection("adjustments").onSnapshot(s=>{rows=s.docs.map(x=>({id:x.id,...x.data()}));buildRange();render()},()=>{db=null;render();status("Lost connection to the log. Reload the page.","err")});
   if(role==="admin"){
     sha("roster:"+passcode).then(id=>{
