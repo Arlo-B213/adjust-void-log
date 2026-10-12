@@ -132,7 +132,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
   <form class="lock-card" id="lock-form" novalidate>
     <div class="eyebrow">Pechanga Food Court · Manager Controls</div>
     <h1 style="margin:0">Adjust &amp; Void Log</h1>
-    <label>Passcode<input id="lock-pass" class="mono pc" type="password" inputmode="numeric" autocomplete="current-password"></label>
+    <label>Passcode<input id="lock-pass" class="mono pc" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="lock-remember" checked style="width:auto"> Remember this device</label>
     <button class="btn" type="submit">Open log</button>
     <span class="status" id="lock-status" role="status"></span>
@@ -140,9 +140,9 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
   <form class="lock-card" id="setup-form" hidden novalidate>
     <div class="eyebrow">First-time setup</div>
     <h2>Choose your passcodes</h2>
-    <p class="note" style="margin:0">Managers use the manager passcode. The admin passcode also opens the team roster and adds names and badges to the Excel report. Use 6 or more digits.</p>
-    <label>Manager passcode<input id="setup-m" class="mono" inputmode="numeric"></label>
-    <label>Admin passcode<input id="setup-a" class="mono" inputmode="numeric"></label>
+    <p class="note" style="margin:0">Managers use the manager passcode. The admin passcode also opens the team roster and adds names and badges to the Excel report. Use 6 or more letters or numbers, like FC1234. Passcodes are case-sensitive.</p>
+    <label>Manager passcode<input id="setup-m" class="mono" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label>Admin passcode<input id="setup-a" class="mono" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <button class="btn" type="submit">Create</button>
     <span class="status" id="setup-status" role="status"></span>
     <div id="setup-out" hidden><p class="note" style="margin:0 0 6px">Paste these two lines into <b>config.js</b>, replacing the empty ones, then commit:</p><pre id="setup-pre"></pre></div>
@@ -667,7 +667,7 @@ $("setup-form").addEventListener("submit",async e=>{
 });
 (async()=>{
   if(!window.CONFIG||!CONFIG.firebase||!CONFIG.firebase.projectId){$("lock-status").textContent="Firebase isn't set up yet. Fill in config.js using the setup guide.";$("lock-status").className="status err";return}
-  if(!CONFIG.managerPasscodeHash||!CONFIG.adminPasscodeHash){$("lock-form").hidden=true;$("setup-form").hidden=false;return}
+  if(!CONFIG.managerPasscodeHash||!CONFIG.adminPasscodeHash||/^#?setup$/.test(location.hash)){$("lock-form").hidden=true;$("setup-form").hidden=false;return}
   let saved=null;try{saved=localStorage.getItem("avl-pass")}catch(e){}
   if(saved){const r=await roleFor(saved);if(r){role=r;passcode=saved;start();return}}
   $("lock-pass").focus();
