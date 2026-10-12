@@ -65,4 +65,4 @@ Opening that URL in a browser should show `{"ok":true,...}`.
 - **Roster privacy:** the roster is stored under an address calculated from the admin passcode, and the rules block listing it. Without the admin passcode it can't be found.
 - **Changing the admin passcode** moves the roster to a new address. Before changing it, download a report or keep your roster spreadsheet, then re-import after the change. Update the Apps Script properties too.
 - **Photos** are never stored. They're sent to the photo reader once to fill in the form, then discarded.
-- **Model:** the photo reader uses `claude-sonnet-5-5`. To lower cost, change `MODEL` in `Code.gs` to `claude-haiku-5-5` and redeploy (**Deploy > Manage deployments > Edit > New version**).
+- **Model:** the photo reader uses `claude-haiku-5-5` (a fraction of a cent per receipt). If it misreads handwriting, change `MODEL` in `Code.gs` to `claude-sonnet-5-5` and redeploy (**Deploy > Manage deployments > Edit > New version**).

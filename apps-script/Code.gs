@@ -12,7 +12,7 @@
  * Deploy > New deployment > Web app: Execute as "Me", Who has access "Anyone".
  */
 
-const MODEL = 'claude-sonnet-5-5';
+const MODEL = 'claude-haiku-5-5';  // switch to 'claude-sonnet-5-5' if handwriting is misread
 
 function doPost(e) {
   try {
