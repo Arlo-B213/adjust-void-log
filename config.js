@@ -15,5 +15,5 @@ window.CONFIG = {
   adminPasscodeHash: "85ce990e5e9ce868b573df041c8d7430fed5bbdb92b14bd486c8a34f88904cf1",
 
   // Google Apps Script web app URL (ends in /exec). Leave empty to skip automatic photo reading.
-  photoReaderUrl: "https://script.google.com/macros/s/AKfycbwVnhHhLEUC6SEBQPwged3bNpwirasS1uLO3Kj9OZapCvuwQd2f4ct5z-JC7TPFkpiigQ/exec"
+  photoReaderUrl: "https://script.google.com/macros/s/AKfycbwwYkzBRXwlIjHz7Ih_UX91K6A9b0PesaIEGwMB_FTM-gehlV5FzgQalhc4jzSkchH5Ew/exec"
 };
