@@ -1,6 +1,6 @@
 # Adjust & Void Log
 
-Pechanga Food Court log for manager adjusts, voids, comps, discounts and refunds. Managers take or upload a photo of the receipt, the form fills itself in, and they tap **Log entry**. The Excel report is built for upper management, with a summary page and one log tab per month.
+Pechanga Food Court log for manager adjusts, voids, comps, discounts and refunds. Managers take or upload a photo of the receipt, the form fills itself in, and they tap **Log entry**. Photos are only used to read the receipt and are never saved. The Excel report is built for upper management, with a summary page and one log tab per month.
 
 ## What's in this repo
 
@@ -20,7 +20,7 @@ Everything runs on free tiers except the photo reading, which is billed per rece
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) and click **Create a project**. Name it something like `adjust-void-log`. Google Analytics isn't needed.
 2. In the left menu, go to **Build > Firestore Database** and click **Create database**. Pick a US location and start in **production mode**.
 3. Open the **Rules** tab and add the rules from `firestore.rules`, then click **Publish**.
-   - **If this Firebase project already runs another app** (this one shares the `soft-skills-f6ae0` project), do **not** replace the existing rules. Copy only the three `match /adjustments`, `match /photos` and `match /roster` blocks and paste them inside the existing `match /databases/{database}/documents { ... }` section, next to the rules that are already there.
+   - **If this Firebase project already runs another app** (this one shares the `soft-skills-f6ae0` project), do **not** replace the existing rules. Copy only the two `match /adjustments` and `match /roster` blocks and paste them inside the existing `match /databases/{database}/documents { ... }` section, next to the rules that are already there.
 4. Go to **Project settings** (gear icon) **> General**. Under **Your apps**, click the **</>** web icon, register an app (no hosting needed), and copy the `firebaseConfig` values into the `firebase` section of `config.js`.
 
 ### 2. GitHub Pages
@@ -64,5 +64,5 @@ Opening that URL in a browser should show `{"ok":true,...}`.
 - **Passcodes:** the passcode screen keeps casual visitors out. The log entries themselves are in a database whose address is in `config.js`, so a technical person with the repo link could read them. That's why the repo should stay **private** if your GitHub plan allows Pages on private repos; otherwise keep the link to your team.
 - **Roster privacy:** the roster is stored under an address calculated from the admin passcode, and the rules block listing it. Without the admin passcode it can't be found.
 - **Changing the admin passcode** moves the roster to a new address. Before changing it, download a report or keep your roster spreadsheet, then re-import after the change. Update the Apps Script properties too.
-- **Photos** are compressed and stored in Firestore, which keeps you on Firebase's free plan.
+- **Photos** are never stored. They're sent to the photo reader once to fill in the form, then discarded.
 - **Model:** the photo reader uses `claude-sonnet-5-5`. To lower cost, change `MODEL` in `Code.gs` to `claude-haiku-5-5` and redeploy (**Deploy > Manage deployments > Edit > New version**).

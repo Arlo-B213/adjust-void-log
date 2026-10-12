@@ -14,16 +14,6 @@ service cloud.firestore {
       allow delete: if true;
     }
 
-    // Receipt photos: fetched one at a time by entry id, never listed.
-    match /photos/{id} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if request.resource.data.data is string
-                    && request.resource.data.data.size() < 1000000;
-      allow update: if false;
-      allow delete: if true;
-    }
-
     // Team roster: stored under an id derived from the admin passcode.
     // It can only be opened by someone who knows that id, and it can never be listed or deleted.
     match /roster/{id} {

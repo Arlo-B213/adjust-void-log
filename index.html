@@ -179,7 +179,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
       <form class="form" id="entry" novalidate>
         <div class="snap" id="snap">
           <div class="ico" id="snap-thumb">RECEIPT</div>
-          <div class="snap-txt"><b id="snap-title">Snap the receipt</b><span id="snap-msg">Take a photo or upload one. The form fills itself in; you check it and tap Log.</span></div>
+          <div class="snap-txt"><b id="snap-title">Snap the receipt</b><span id="snap-msg">Take a photo or upload one. The form fills itself in; you check it and tap Log. Photos are only used to read the receipt and are never saved.</span></div>
           <div class="snap-btns">
             <label class="btn snap-btn" for="e-cam">Take photo</label>
             <label class="btn ghost snap-btn" for="e-photo">Upload photo</label>
@@ -319,7 +319,7 @@ function render(){
     <td>${esc(r.outlet)}</td>
     <td class="mono">${esc(r.check)}</td>
     <td>${esc(r.server)}</td>
-    <td>${esc(r.item)}${r.notes?`<div class="note">${esc(r.notes)}</div>`:""}${r.hasPhoto?`<div><button type="button" class="linkbtn ph" data-photo="${esc(r.id)}">View receipt photo</button></div>`:""}</td>
+    <td>${esc(r.item)}${r.notes?`<div class="note">${esc(r.notes)}</div>`:""}</td>
     <td><span class="pill ${r.type==="Void"?"void":r.type==="Manager Adjust"?"adj":""}">${esc(r.type)}</span></td>
     <td>${esc(r.reason)}</td>
     <td class="num">${money(r.amount)}</td>
@@ -334,18 +334,9 @@ $("log").addEventListener("click",async e=>{
   const id=b.dataset.id;
   if(pendingDel!==id){pendingDel=id;render();setTimeout(()=>{if(pendingDel===id){pendingDel=null;render()}},4000);return}
   pendingDel=null;
-  try{const r=rows.find(x=>x.id===id);await db.collection("adjustments").doc(id).delete();if(r&&r.hasPhoto)db.collection("photos").doc(id).delete().catch(()=>{})}catch(err){status("Couldn't delete that entry. Try again in a moment.","err")}
+  try{const r=rows.find(x=>x.id===id);await db.collection("adjustments").doc(id).delete();}catch(err){status("Couldn't delete that entry. Try again in a moment.","err")}
 });
-$("log").addEventListener("click",async e=>{
-  const b=e.target.closest("[data-photo]");if(!b)return;
-  const w=window.open("","_blank");
-  try{
-    const sn=await db.collection("photos").doc(b.dataset.photo).get();
-    if(!sn.exists){if(w)w.close();status("That photo couldn't be found.","err");return}
-    const blob=await (await fetch(sn.data().data)).blob(), u=URL.createObjectURL(blob);
-    if(w)w.location.href=u;else location.href=u;
-  }catch(err){if(w)w.close();status("Couldn't open the photo. Try again.","err")}
-});
+
 
 function status(msg,cls){const s=$("e-status");s.textContent=msg;s.className="status "+(cls||"")}
 $("entry").addEventListener("submit",async e=>{
@@ -363,12 +354,7 @@ $("entry").addEventListener("submit",async e=>{
   $("e-save").disabled=true;
   try{
     const ref=db.collection("adjustments").doc();
-    let photoNote="";
-    if(photoData){
-      status("Saving photo…");
-      try{await db.collection("photos").doc(ref.id).set({data:photoData,createdAt:doc.createdAt});doc.hasPhoto=true}
-      catch(e){photoNote=" The photo couldn't be saved, but the entry was."}
-    }
+    const photoNote="";
     status("Saving entry…");
     await ref.set(doc);
     const mk=doc.when.slice(0,7), sel=$("f-range");
@@ -385,11 +371,11 @@ $("entry").addEventListener("submit",async e=>{
   }finally{$("e-save").disabled=!canWrite}
 });
 
-let photoBlob=null, photoData="", thumbUrl="", confirmDup=false;
+let photoBlob=null, thumbUrl="", confirmDup=false;
 try{const m=localStorage.getItem("avl-mgr");if(m)$("e-mgr").value=m}catch(e){}
 
 function snapState(title,msg){$("snap-title").textContent=title;$("snap-msg").textContent=msg}
-function resetSnap(){photoBlob=null;photoData="";if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=""}$("snap-thumb").textContent="RECEIPT";snapState("Snap the next receipt","Take a photo or upload one. The form fills itself in; you check it and tap Log.")}
+function resetSnap(){photoBlob=null;if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=""}$("snap-thumb").textContent="RECEIPT";snapState("Snap the next receipt","Take a photo or upload one. The form fills itself in; you check it and tap Log. Photos are never saved.")}
 /* One small copy of the photo, made once: phone cameras produce 12+ megapixel images,
    so decode once, draw at most 1600px, then free everything to avoid low-memory errors. */
 async function shrink(file){
@@ -402,13 +388,11 @@ async function shrink(file){
     c.width=Math.round(img.naturalWidth*s);c.height=Math.round(img.naturalHeight*s);
     c.getContext("2d").drawImage(img,0,0,c.width,c.height);
     img.src="";img=null;URL.revokeObjectURL(url);
-    let q=.72, data=c.toDataURL("image/jpeg",q);
-    while(data.length>900000&&q>.35){q-=.12;data=c.toDataURL("image/jpeg",q)}
-    const blob=await new Promise(res=>c.toBlob(b=>res(b),"image/jpeg",q));
-    return {blob:blob||file,data:data.length<=900000?data:""};
+    const blob=await new Promise(res=>c.toBlob(b=>res(b),"image/jpeg",.8));
+    return {blob:blob||file};
   }catch(e){
     URL.revokeObjectURL(url);
-    return {blob:file,data:""};
+    return {blob:file};
   }finally{c.width=0;c.height=0;c=null}
 }
 function setField(id,val){if(val==null||val==="")return;const el=$(id);el.value=val;el.classList.remove("filled");void el.offsetWidth;el.classList.add("filled")}
@@ -416,10 +400,10 @@ async function readReceipt(file){
   if(!file||!/^image\//.test(file.type)){snapState("That isn't a photo","Choose a picture of the receipt (JPG, PNG or HEIC).");return}
   const snap=$("snap");snap.classList.add("busy");
   snapState("Preparing photo…","One moment.");
-  const sh=await shrink(file);photoBlob=sh.blob;photoData=sh.data;
+  const sh=await shrink(file);photoBlob=sh.blob;
   if(thumbUrl)URL.revokeObjectURL(thumbUrl);
   thumbUrl=URL.createObjectURL(photoBlob);$("snap-thumb").innerHTML=`<img alt="Receipt photo" src="${thumbUrl}">`;
-  if(!CONFIG.photoReaderUrl){snapState("Photo attached","Automatic reading isn't turned on yet. Fill in the details below, then tap Log entry to add it to the log.");snap.classList.remove("busy");return}
+  if(!CONFIG.photoReaderUrl){snapState("Photo ready","Automatic reading isn't turned on yet. Fill in the details below, then tap Log entry. The photo isn't saved.");snap.classList.remove("busy");return}
   snapState("Reading receipt…","This takes a few seconds.");
   const prompt=`The image is a printed point-of-sale receipt from a Pechanga Resort Casino food court outlet, possibly with handwriting on it explaining a manager adjustment or void. Extract these fields and answer ONLY with a JSON object:
 {"outlet": one of ${JSON.stringify(OUTLETS)} matching the name at the top (closest match) or "",
@@ -543,8 +527,8 @@ async function buildReport(list){
   s.mergeCells("A2:E2");const t2=s.getCell("A2");t2.value=scope+"  ·  Pechanga Resort Casino";t2.font={size:12,bold:true,color:{argb:GOLD}};t2.alignment={indent:1};s.getRow(2).height=20;
   s.mergeCells("A3:E3");const t3=s.getCell("A3");t3.value="Prepared "+new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});t3.font={size:10,italic:true,color:{argb:GREY}};t3.alignment={indent:1};
 
-  const total=sum(list), voids=list.filter(r=>r.type==="Void").length, photos=list.filter(r=>r.hasPhoto).length;
-  const kpis=[["ENTRIES",list.length,"0"],["DOLLARS ADJUSTED",total,MF],["AVG PER ENTRY",list.length?total/list.length:0,MF],["VOIDS",voids,"0"],["PHOTO ON FILE",list.length?photos/list.length:0,"0%"]];
+  const total=sum(list), voids=list.filter(r=>r.type==="Void").length;
+  const kpis=[["ENTRIES",list.length,"0"],["DOLLARS ADJUSTED",total,MF],["AVG PER ENTRY",list.length?total/list.length:0,MF],["VOIDS",voids,"0"],["AVG $ PER DAY",(()=>{const d=new Set(list.map(r=>String(r.when).slice(0,10))).size;return d?total/d:0})(),MF]];
   kpis.forEach(([k,val,f],i)=>{
     const a=s.getCell(5,i+1);a.value=k;a.font={size:9,bold:true,color:{argb:GREY}};a.fill=fillC(GOLDL);a.alignment={horizontal:"center"};
     const b=s.getCell(6,i+1);b.value=val;b.numFmt=f;b.font={size:16,bold:true,color:{argb:i===1?RED:NAVY}};b.fill=fillC(GOLDL);b.alignment={horizontal:"center",vertical:"middle"};
@@ -585,20 +569,20 @@ async function buildReport(list){
 
   /* ---------- One log tab per month ---------- */
   const byMonth=new Map();list.forEach(r=>{const k=String(r.when).slice(0,7);if(!byMonth.has(k))byMonth.set(k,[]);byMonth.get(k).push(r)});
-  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Notes","Photo"];
-  const widths=[12,10,22,10,24,10,18,26,16,20,12,18,44,8];
+  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Notes"];
+  const widths=[12,10,22,10,24,10,18,26,16,20,12,18,44];
   [...byMonth.keys()].sort().reverse().forEach(k=>{
     const items=byMonth.get(k);
     const w=wb.addWorksheet(monthLabel(k,true),{properties:{tabColor:{argb:NAVY}},views:[{state:"frozen",ySplit:4,showGridLines:false}]});
     w.columns=widths.map(x=>({width:x}));
     w.pageSetup={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:"4:4",margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
-    w.mergeCells("A1:N1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
-    w.mergeCells("A2:N2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
+    w.mergeCells("A1:M1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
+    w.mergeCells("A2:M2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
     const hr=w.getRow(4);head.forEach((x,i)=>{const c=hr.getCell(i+1);c.value=x;c.font={bold:true,color:{argb:WHITE},size:10};c.fill=fillC(GOLD);c.alignment={horizontal:i===10?"right":"left",vertical:"middle"}});hr.height=20;
     items.forEach((r,i)=>{
       const d=new Date(r.when);
       const x=w.getRow(5+i);
-      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.notes||"",r.hasPhoto?"Yes":""]
+      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.notes||""]
         .forEach((val,j)=>{const c=x.getCell(j+1);c.value=val;c.border={bottom:thin};c.alignment={vertical:"top",wrapText:j===7||j===12,horizontal:j===10?"right":"left"};if(i%2)c.fill=fillC(BAND)});
       x.getCell(1).numFmt="mm/dd/yyyy";x.getCell(11).numFmt=MF;x.getCell(11).font={color:{argb:RED}};
       x.getCell(5).font=r._name?{bold:true,color:{argb:NAVY}}:{italic:true,color:{argb:GREY}};
@@ -607,7 +591,7 @@ async function buildReport(list){
     const last=4+items.length, tr=w.getRow(last+1);
     tr.getCell(10).value="Total";tr.getCell(11).value={formula:`SUM(K5:K${last})`,result:sum(items)};tr.getCell(11).numFmt=MF;
     [10,11].forEach(j=>{const c=tr.getCell(j);c.font={bold:true,color:{argb:NAVY}};c.border={top:{style:"medium",color:{argb:NAVY}}};c.alignment={horizontal:"right"}});
-    w.autoFilter={from:{row:4,column:1},to:{row:last,column:14}};
+    w.autoFilter={from:{row:4,column:1},to:{row:last,column:13}};
   });
   return await wb.xlsx.writeBuffer();
 }
