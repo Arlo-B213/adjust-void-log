@@ -196,7 +196,8 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
         <label class="full">Item(s)<input id="e-item" placeholder="SD- Mexican Rice" required></label>
         <label>Amount adjusted <small>incl. tax</small><input id="e-amount" class="mono" type="number" min="0" step="0.01" placeholder="4.09" required></label>
         <label>Reason<select id="e-reason" required></select></label>
-        <label class="full">Approved by (manager)<input id="e-mgr" placeholder="Manager name" required></label>
+        <label>Manager name <small>approved by</small><input id="e-mgr" placeholder="Samantha Gamboa" required></label>
+        <label>Manager badge #<input id="e-mgrbadge" class="mono" inputmode="numeric" placeholder="27220"></label>
         <label class="full">Notes <small>optional</small><textarea id="e-notes" placeholder="What happened, what the guest was told"></textarea></label>
         <div class="row-actions full">
           <button class="btn" type="submit" id="e-save">Log entry</button>
@@ -251,7 +252,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
 <script>
 const OUTLETS=["Agave","American Classics","Café Cocoa's","Little Wok","Pechanga Fried Chicken","Pronto","Portable Smart Bar"];
 const TYPES=["Manager Adjust","Void","Comp","Discount","Refund"];
-const REASONS=["Guest changed mind","Rung in wrong","Duplicate ring","Food quality","Long wait","Kitchen error","Price correction","Guest recovery","Other"];
+const REASONS=["Guest changed mind","Rung in wrong","Duplicate ring","Food quality","Long wait","Kitchen error","Price correction","Guest recovery","Equipment test / calibration","Other"];
 const $=id=>document.getElementById(id);
 const fill=(el,arr,first)=>{el.innerHTML=(first?`<option value="">${first}</option>`:"")+arr.map(v=>`<option>${esc(v)}</option>`).join("")};
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
@@ -323,7 +324,7 @@ function render(){
     <td><span class="pill ${r.type==="Void"?"void":r.type==="Manager Adjust"?"adj":""}">${esc(r.type)}</span></td>
     <td>${esc(r.reason)}</td>
     <td class="num">${money(r.amount)}</td>
-    <td>${esc(r.approvedBy)}</td>
+    <td>${esc(r.approvedBy)}${r.mgrBadge?`<div class="note mono">#${esc(r.mgrBadge)}</div>`:""}</td>
     <td>${role==="admin"?`<button class="del ${pendingDel===r.id?"confirm":""}" data-id="${esc(r.id)}">${pendingDel===r.id?"Confirm delete":"Delete"}</button>`:""}</td>
   </tr>`).join("");
 }
@@ -347,10 +348,10 @@ $("entry").addEventListener("submit",async e=>{
   const missing=[["e-check","check #"],["e-when","date & time"],["e-server","team member"],["e-item","item"],["e-mgr","approving manager"]].filter(([id])=>!v(id)).map(x=>x[1]);
   if(!(amount>0))missing.push("amount");
   if(missing.length){status("Add the "+missing.join(", ")+" to log this entry.","err");return}
-  const doc={when:v("e-when"),outlet:v("e-outlet"),type:v("e-type"),check:v("e-check"),server:v("e-server"),item:v("e-item"),amount:Math.round(amount*100)/100,reason:v("e-reason"),approvedBy:v("e-mgr"),notes:v("e-notes"),loggedBy:role,createdAt:new Date().toISOString()};
+  const doc={when:v("e-when"),outlet:v("e-outlet"),type:v("e-type"),check:v("e-check"),server:v("e-server"),item:v("e-item"),amount:Math.round(amount*100)/100,reason:v("e-reason"),approvedBy:v("e-mgr"),mgrBadge:v("e-mgrbadge").replace(/\D/g,""),notes:v("e-notes"),loggedBy:role,createdAt:new Date().toISOString()};
   if(!confirmDup&&rows.some(r=>r.check===doc.check&&r.outlet===doc.outlet)){confirmDup=true;status(`Check ${doc.check} at ${doc.outlet} is already logged. Tap Log entry again to add it anyway.`,"err");return}
   confirmDup=false;
-  try{localStorage.setItem("avl-mgr",doc.approvedBy)}catch(e){}
+  try{localStorage.setItem("avl-mgr",doc.approvedBy);localStorage.setItem("avl-mgrbadge",doc.mgrBadge)}catch(e){}
   $("e-save").disabled=true;
   try{
     const ref=db.collection("adjustments").doc();
@@ -372,7 +373,7 @@ $("entry").addEventListener("submit",async e=>{
 });
 
 let photoBlob=null, thumbUrl="", confirmDup=false;
-try{const m=localStorage.getItem("avl-mgr");if(m)$("e-mgr").value=m}catch(e){}
+try{const m=localStorage.getItem("avl-mgr");if(m)$("e-mgr").value=m;const mb=localStorage.getItem("avl-mgrbadge");if(mb)$("e-mgrbadge").value=mb}catch(e){}
 
 function snapState(title,msg){$("snap-title").textContent=title;$("snap-msg").textContent=msg}
 function resetSnap(){photoBlob=null;if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=""}$("snap-thumb").textContent="RECEIPT";snapState("Snap the next receipt","Take a photo or upload one. The form fills itself in; you check it and tap Log. Photos are never saved.")}
@@ -405,18 +406,25 @@ async function readReceipt(file){
   thumbUrl=URL.createObjectURL(photoBlob);$("snap-thumb").innerHTML=`<img alt="Receipt photo" src="${thumbUrl}">`;
   if(!CONFIG.photoReaderUrl){snapState("Photo ready","Automatic reading isn't turned on yet. Fill in the details below, then tap Log entry. The photo isn't saved.");snap.classList.remove("busy");return}
   snapState("Reading receipt…","This takes a few seconds.");
-  const prompt=`The image is a printed point-of-sale receipt from a Pechanga Resort Casino food court outlet, possibly with handwriting on it explaining a manager adjustment or void. Extract these fields and answer ONLY with a JSON object:
-{"outlet": one of ${JSON.stringify(OUTLETS)} matching the name at the top (closest match) or "",
-"check": the CHK number digits only,
-"when": check date and time as "YYYY-MM-DDTHH:MM" 24-hour,
-"server": the team member line exactly as printed above the check number, e.g. "315 Michael H",
-"item": the item line(s) as printed, comma separated, without prices,
-"type": one of ${JSON.stringify(TYPES)} based on the adjustment/void/comp/discount/refund line, default "Manager Adjust",
-"amount": the adjusted dollar amount including tax as a number (the adjust/void line amount, or the total if unclear),
-"reason": one of ${JSON.stringify(REASONS)} that best matches any handwritten note, or "Other",
-"handwriting": the handwritten note transcribed, or "",
-"approvedBy": a manager name ONLY if written or printed as approving, else ""}
-Use "" for anything you cannot read.`;
+  const prompt=`The image is a photo of a Pechanga Resort Casino food court receipt for a manager adjustment or void. The photo may be rotated sideways or upside down; read it in whatever orientation it is in. It usually has two parts:
+1) The printed POS check: outlet name under "Pechanga Resort Casino" (e.g. "Agave"), a team member line like "20356 Selena M" (number, then first name and last initial), "CHK 20976", the check date and time, item lines like "1 LONG BEACH TEA 14.00", and an adjustment line like "Manager Adjust $14.00", then Subtotal, Tax (sometimes absent), Payment.
+2) A printed adjustment slip below it with handwritten answers: "AMOUNT:", "Man Badge:" (manager badge number), "Man Name:" (manager name), "Reason:", "NOTES:" and a "Signature:" line.
+Older receipts may have no slip and just a handwritten note on the check.
+Answer ONLY with a JSON object:
+{"outlet": one of ${JSON.stringify(OUTLETS)} matching the outlet name (closest match), or "",
+"check": the CHK number, digits only,
+"when": the check date and time as "YYYY-MM-DDTHH:MM" in 24-hour time (use the check time, not the Check Closed time),
+"server": the team member line exactly as printed, e.g. "20356 Selena M",
+"item": the item line(s) without quantity or prices, e.g. "Long Beach Tea"; separate several with commas,
+"type": one of ${JSON.stringify(TYPES)} based on the adjustment/void/comp/discount/refund line; default "Manager Adjust",
+"amount": the AMOUNT on the slip as a number; if there is no slip, the adjustment line amount including tax,
+"managerName": the handwritten Man Name, or a manager name written on the check, else "",
+"managerBadge": the handwritten Man Badge digits only, else "",
+"reasonText": the handwritten Reason line, transcribed, else "",
+"notesText": the handwritten NOTES, or any other handwritten note on the check, transcribed, else "",
+"reason": one of ${JSON.stringify(REASONS)} that best fits reasonText and notesText together (e.g. "recalibrating" or "testing machine" fits "Equipment test / calibration"); use "Other" if nothing fits,
+"signed": true if the Signature line has a signature, false if it is blank or there is no slip}
+Handwriting can be messy; give your best reading. Use "" for anything you cannot read at all.`;
   try{
     const r=await readViaScript(prompt,photoBlob);
     if(OUTLETS.includes(r.outlet))setField("e-outlet",r.outlet);
@@ -426,8 +434,10 @@ Use "" for anything you cannot read.`;
     if(TYPES.includes(r.type))setField("e-type",r.type);
     if(Number(r.amount)>0)setField("e-amount",Number(r.amount).toFixed(2));
     if(REASONS.includes(r.reason))setField("e-reason",r.reason);
-    if(r.handwriting)setField("e-notes",`Handwritten: "${r.handwriting}"`);
-    if(r.approvedBy)setField("e-mgr",r.approvedBy);
+    const noteBits=[r.reasonText&&`Reason: ${r.reasonText}`,r.notesText&&`Notes: ${r.notesText}`,r.signed===false&&"Slip not signed"].filter(Boolean);
+    if(noteBits.length)setField("e-notes",noteBits.join(" · "));
+    if(r.managerName)setField("e-mgr",r.managerName);
+    if(r.managerBadge)setField("e-mgrbadge",String(r.managerBadge).replace(/\D/g,""));
     snapState("Filled in from the photo","Check the highlighted fields, then tap Log entry at the bottom to add it to the log.");
     status("");
   }catch(err){
@@ -510,7 +520,7 @@ function rosterClick(e){
 $("r-list").addEventListener("click",rosterClick);$("r-former").addEventListener("click",rosterClick);
 
 async function buildReport(list){
-  list=list.map(r=>{const p=matchCashier(r.server);return {...r,_name:p?p.name:"",_badge:p?String(p.badge):"",_who:p?`${p.name} (#${p.badge})`:(r.server||"(blank)")+(roster.length?" · not on roster":"")}});
+  list=list.map(r=>{const p=matchCashier(r.server);return {...r,_name:p?p.name:"",_badge:p?String(p.badge):"",_who:p?`${p.name} (#${p.badge})`:(r.server||"(blank)")+(roster.length?" · not on roster":""),_mgr:(r.approvedBy||"(not recorded)")+(r.mgrBadge?` (#${r.mgrBadge})`:"")}});
   const NAVY="FF1B2A41",GOLD="FFA8741F",GOLDL="FFF4EAD8",BAND="FFF5F7FA",LINE="FFD9DFE7",RED="FFB3372F",GREY="FF5D6B7E",WHITE="FFFFFFFF",MF='"$"#,##0.00';
   const fillC=a=>({type:"pattern",pattern:"solid",fgColor:{argb:a}});
   const thin={style:"thin",color:{argb:LINE}};
@@ -564,26 +574,27 @@ async function buildReport(list){
   section("Outlet","outlet");
   section("Reason","reason");
   section("Type","type");
+  section("Approving Manager","_mgr");
   section("Cashier","_who",3);
   s.mergeCells(row,1,row,5);const ft=s.getCell(row,1);ft.value="Cashiers with 3 or more entries in the period are marked for follow-up. Names and badge numbers come from the team roster; amounts include tax.";ft.font={size:9,italic:true,color:{argb:GREY}};ft.alignment={indent:1,wrapText:true};
 
   /* ---------- One log tab per month ---------- */
   const byMonth=new Map();list.forEach(r=>{const k=String(r.when).slice(0,7);if(!byMonth.has(k))byMonth.set(k,[]);byMonth.get(k).push(r)});
-  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Notes"];
-  const widths=[12,10,22,10,24,10,18,26,16,20,12,18,44];
+  const head=["Date","Time","Outlet","Check #","Cashier","Badge #","Name on Receipt","Item(s)","Type","Reason","Amount","Approved By","Mgr Badge","Notes"];
+  const widths=[12,10,22,10,24,10,18,26,16,20,12,20,11,44];
   [...byMonth.keys()].sort().reverse().forEach(k=>{
     const items=byMonth.get(k);
     const w=wb.addWorksheet(monthLabel(k,true),{properties:{tabColor:{argb:NAVY}},views:[{state:"frozen",ySplit:4,showGridLines:false}]});
     w.columns=widths.map(x=>({width:x}));
     w.pageSetup={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:"4:4",margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
-    w.mergeCells("A1:M1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
-    w.mergeCells("A2:M2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
+    w.mergeCells("A1:N1");const a=w.getCell("A1");a.value=`${monthLabel(k)} · Adjust & Void Log`;a.font={size:16,bold:true,color:{argb:WHITE}};a.fill=fillC(NAVY);a.alignment={vertical:"middle",indent:1};w.getRow(1).height=28;
+    w.mergeCells("A2:N2");const b=w.getCell("A2");b.value=`${items.length} entr${items.length===1?"y":"ies"}  ·  $${sum(items).toFixed(2)} adjusted`;b.font={size:11,bold:true,color:{argb:GOLD}};b.alignment={indent:1};
     const hr=w.getRow(4);head.forEach((x,i)=>{const c=hr.getCell(i+1);c.value=x;c.font={bold:true,color:{argb:WHITE},size:10};c.fill=fillC(GOLD);c.alignment={horizontal:i===10?"right":"left",vertical:"middle"}});hr.height=20;
     items.forEach((r,i)=>{
       const d=new Date(r.when);
       const x=w.getRow(5+i);
-      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.notes||""]
-        .forEach((val,j)=>{const c=x.getCell(j+1);c.value=val;c.border={bottom:thin};c.alignment={vertical:"top",wrapText:j===7||j===12,horizontal:j===10?"right":"left"};if(i%2)c.fill=fillC(BAND)});
+      [new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())),d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}),r.outlet,r.check,r._name||(roster.length?"Not on roster":""),r._badge,r.server,r.item,r.type,r.reason,+r.amount||0,r.approvedBy||"",r.mgrBadge||"",r.notes||""]
+        .forEach((val,j)=>{const c=x.getCell(j+1);c.value=val;c.border={bottom:thin};c.alignment={vertical:"top",wrapText:j===7||j===13,horizontal:j===10?"right":"left"};if(i%2)c.fill=fillC(BAND)});
       x.getCell(1).numFmt="mm/dd/yyyy";x.getCell(11).numFmt=MF;x.getCell(11).font={color:{argb:RED}};
       x.getCell(5).font=r._name?{bold:true,color:{argb:NAVY}}:{italic:true,color:{argb:GREY}};
       if(r.type==="Void")x.getCell(9).font={bold:true,color:{argb:RED}};
@@ -591,7 +602,7 @@ async function buildReport(list){
     const last=4+items.length, tr=w.getRow(last+1);
     tr.getCell(10).value="Total";tr.getCell(11).value={formula:`SUM(K5:K${last})`,result:sum(items)};tr.getCell(11).numFmt=MF;
     [10,11].forEach(j=>{const c=tr.getCell(j);c.font={bold:true,color:{argb:NAVY}};c.border={top:{style:"medium",color:{argb:NAVY}}};c.alignment={horizontal:"right"}});
-    w.autoFilter={from:{row:4,column:1},to:{row:last,column:13}};
+    w.autoFilter={from:{row:4,column:1},to:{row:last,column:14}};
   });
   return await wb.xlsx.writeBuffer();
 }
