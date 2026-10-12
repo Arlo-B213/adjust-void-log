@@ -19,7 +19,8 @@ Everything runs on free tiers except the photo reading, which is billed per rece
 
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) and click **Create a project**. Name it something like `adjust-void-log`. Google Analytics isn't needed.
 2. In the left menu, go to **Build > Firestore Database** and click **Create database**. Pick a US location and start in **production mode**.
-3. Open the **Rules** tab, replace everything with the contents of `firestore.rules`, and click **Publish**.
+3. Open the **Rules** tab and add the rules from `firestore.rules`, then click **Publish**.
+   - **If this Firebase project already runs another app** (this one shares the `soft-skills-f6ae0` project), do **not** replace the existing rules. Copy only the three `match /adjustments`, `match /photos` and `match /roster` blocks and paste them inside the existing `match /databases/{database}/documents { ... }` section, next to the rules that are already there.
 4. Go to **Project settings** (gear icon) **> General**. Under **Your apps**, click the **</>** web icon, register an app (no hosting needed), and copy the `firebaseConfig` values into the `firebase` section of `config.js`.
 
 ### 2. GitHub Pages
