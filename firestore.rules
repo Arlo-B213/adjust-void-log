@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Log entries: anyone with the app can read and add; entries can't be edited after logging.
+    match /adjustments/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['when', 'outlet', 'check', 'amount'])
+                    && request.resource.data.amount is number
+                    && request.resource.data.amount >= 0
+                    && request.resource.data.amount < 10000
+                    && request.resource.data.size() <= 20;
+      allow update: if false;
+      allow delete: if true;
+    }
+
+    // Receipt photos: fetched one at a time by entry id, never listed.
+    match /photos/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.resource.data.data is string
+                    && request.resource.data.data.size() < 1000000;
+      allow update: if false;
+      allow delete: if true;
+    }
+
+    // Team roster: stored under an id derived from the admin passcode.
+    // It can only be opened by someone who knows that id, and it can never be listed or deleted.
+    match /roster/{id} {
+      allow get, create, update: if id.size() == 40;
+      allow list, delete: if false;
+    }
+  }
+}
