@@ -113,7 +113,7 @@ details.roster>summary::before{content:"▸";color:var(--accent);transition:tran
 details.roster[open]>summary::before{transform:rotate(90deg)}
 details.roster>summary span{font-size:13px;color:var(--muted)}
 .rbody{padding:0 18px 18px;display:grid;gap:14px}
-.radd{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1.2fr) minmax(0,1.2fr) auto;gap:10px;align-items:end}
+.radd{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,1.4fr) auto;gap:10px;align-items:end}
 .rlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:6px}
 .rp{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-size:14px;min-width:0}
 .rp .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -192,7 +192,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
         <label>Type<select id="e-type" required></select></label>
         <label>Check #<input id="e-check" class="mono" inputmode="numeric" placeholder="20441" required></label>
         <label>Date &amp; time<input id="e-when" type="datetime-local" required></label>
-        <label class="full">Team member on check <small>number and name, as printed</small><input id="e-server" placeholder="315 Michael H" required></label>
+        <label class="full">Team member on check <small>first name and last initial</small><input id="e-server" placeholder="Selena M" required></label>
         <label class="full">Item(s)<input id="e-item" placeholder="SD- Mexican Rice" required></label>
         <label>Amount adjusted <small>incl. tax</small><input id="e-amount" class="mono" type="number" min="0" step="0.01" placeholder="4.09" required></label>
         <label>Reason<select id="e-reason" required></select></label>
@@ -222,7 +222,6 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
       <form class="radd" id="r-form" novalidate>
         <label>Full name<input id="r-name" placeholder="First Last" autocomplete="off"></label>
         <label>Badge #<input id="r-badge" class="mono" inputmode="numeric" placeholder="28355"></label>
-        <label>POS # <small>optional</small><input id="r-pos" class="mono" inputmode="numeric" placeholder="315"></label>
         <button class="btn" type="submit">Add</button>
       </form>
       <div class="row-actions"><input id="r-search" placeholder="Search the roster" style="max-width:280px" aria-label="Search the roster"><label class="btn ghost" for="r-import" style="display:inline-block;font-size:14px">Import from Excel</label><input type="file" id="r-import" accept=".xlsx" class="vh" tabindex="-1"><span class="status" id="r-status" role="status"></span></div>
@@ -348,7 +347,7 @@ $("entry").addEventListener("submit",async e=>{
   const missing=[["e-check","check #"],["e-when","date & time"],["e-server","team member"],["e-item","item"],["e-mgr","approving manager"]].filter(([id])=>!v(id)).map(x=>x[1]);
   if(!(amount>0))missing.push("amount");
   if(missing.length){status("Add the "+missing.join(", ")+" to log this entry.","err");return}
-  const doc={when:v("e-when"),outlet:v("e-outlet"),type:v("e-type"),check:v("e-check"),server:v("e-server"),item:v("e-item"),amount:Math.round(amount*100)/100,reason:v("e-reason"),approvedBy:v("e-mgr"),mgrBadge:v("e-mgrbadge").replace(/\D/g,""),notes:v("e-notes"),loggedBy:role,createdAt:new Date().toISOString()};
+  const doc={when:v("e-when"),outlet:v("e-outlet"),type:v("e-type"),check:v("e-check"),server:v("e-server").replace(/^\d+\s*/,""),item:v("e-item"),amount:Math.round(amount*100)/100,reason:v("e-reason"),approvedBy:v("e-mgr"),mgrBadge:v("e-mgrbadge").replace(/\D/g,""),notes:v("e-notes"),loggedBy:role,createdAt:new Date().toISOString()};
   if(!confirmDup&&rows.some(r=>r.check===doc.check&&r.outlet===doc.outlet)){confirmDup=true;status(`Check ${doc.check} at ${doc.outlet} is already logged. Tap Log entry again to add it anyway.`,"err");return}
   confirmDup=false;
   try{localStorage.setItem("avl-mgr",doc.approvedBy);localStorage.setItem("avl-mgrbadge",doc.mgrBadge)}catch(e){}
@@ -414,7 +413,7 @@ Answer ONLY with a JSON object:
 {"outlet": one of ${JSON.stringify(OUTLETS)} matching the outlet name (closest match), or "",
 "check": the CHK number, digits only,
 "when": the check date and time as "YYYY-MM-DDTHH:MM" in 24-hour time (use the check time, not the Check Closed time),
-"server": the team member line exactly as printed, e.g. "20356 Selena M",
+"server": the team member's first name and last initial only, without the number in front, e.g. "Selena M" from "20356 Selena M",
 "item": the item line(s) without quantity or prices, e.g. "Long Beach Tea"; separate several with commas,
 "type": one of ${JSON.stringify(TYPES)} based on the adjustment/void/comp/discount/refund line; default "Manager Adjust",
 "amount": the AMOUNT on the slip as a number; if there is no slip, the adjustment line amount including tax,
@@ -430,7 +429,7 @@ Handwriting can be messy; give your best reading. Use "" for anything you cannot
     if(OUTLETS.includes(r.outlet))setField("e-outlet",r.outlet);
     setField("e-check",String(r.check||"").replace(/\D/g,""));
     if(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(r.when||""))setField("e-when",r.when);
-    setField("e-server",r.server);setField("e-item",r.item);
+    setField("e-server",String(r.server||"").replace(/^\s*\d+\s*/,""));setField("e-item",r.item);
     if(TYPES.includes(r.type))setField("e-type",r.type);
     if(Number(r.amount)>0)setField("e-amount",Number(r.amount).toFixed(2));
     if(REASONS.includes(r.reason))setField("e-reason",r.reason);
@@ -467,7 +466,6 @@ function nameParts(n){const t=String(n).trim().toLowerCase().split(/\s+/).filter
 function matchCashier(text){
   if(!roster.length||!text)return null;
   const m=String(text).trim().match(/^(\d+)?\s*(.*)$/), num=m[1], parts=nameParts(m[2]||"");
-  if(num){const p=roster.find(p=>p.pos&&String(p.pos)===num);if(p)return p}
   if(!parts.length)return null;
   const first=parts[0], li=parts.length>1?parts[parts.length-1][0]:"";
   const c=roster.filter(p=>{const t=nameParts(p.name);return t[0]===first&&(!li||t[t.length-1][0]===li)});
@@ -489,7 +487,7 @@ function renderRoster(){
   const show=a=>a.filter(p=>!q||p.name.toLowerCase().includes(q)||String(p.badge).includes(q));
   $("r-count").textContent=`${act.length} active`;
   $("r-former-n").textContent=old.length;$("r-former-wrap").hidden=!old.length;
-  const card=(p,former)=>`<div class="rp"><span class="nm" title="${esc(p.name)}">${esc(p.name)}</span><span class="bd">#${esc(p.badge)}${p.pos?` · POS ${esc(p.pos)}`:""}</span><span class="acts">${former
+  const card=(p,former)=>`<div class="rp"><span class="nm" title="${esc(p.name)}">${esc(p.name)}</span><span class="bd">#${esc(p.badge)}</span><span class="acts">${former
     ?`<button class="del" data-act="restore" data-b="${esc(p.badge)}">Restore</button><button class="del ${rPending==="d"+p.badge?"confirm":""}" data-act="delete" data-b="${esc(p.badge)}">${rPending==="d"+p.badge?"Confirm":"Delete"}</button>`
     :`<button class="del ${rPending==="r"+p.badge?"confirm":""}" data-act="remove" data-b="${esc(p.badge)}">${rPending==="r"+p.badge?"Confirm remove":"Remove"}</button>`}</span></div>`;
   const a=show(act);$("r-list").innerHTML=a.length?a.map(p=>card(p,false)).join(""):`<div class="note">${q?"No one matches that search.":"No one on the roster yet. Add your first cashier above."}</div>`;
@@ -498,14 +496,14 @@ function renderRoster(){
 $("r-search").addEventListener("input",renderRoster);
 $("r-form").addEventListener("submit",e=>{
   e.preventDefault();
-  const name=$("r-name").value.trim().replace(/\s+/g," "), badge=$("r-badge").value.replace(/\D/g,""), pos=$("r-pos").value.replace(/\D/g,"");
+  const name=$("r-name").value.trim().replace(/\s+/g," "), badge=$("r-badge").value.replace(/\D/g,""), pos="";
   const rs=$("r-status");
   if(!name||!badge){rs.textContent="Enter a full name and badge # to add someone.";rs.className="status err";return}
   const ex=roster.find(p=>String(p.badge)===badge);
   if(ex&&ex.active!==false){rs.textContent=`Badge #${badge} already belongs to ${ex.name}.`;rs.className="status err";return}
   const next=roster.filter(p=>String(p.badge)!==badge).concat([{name,badge,pos,active:true}]);
   roster=next;renderRoster();saveRoster(next,`Added ${name}.`);
-  ["r-name","r-badge","r-pos"].forEach(id=>$(id).value="");$("r-name").focus();
+  ["r-name","r-badge"].forEach(id=>$(id).value="");$("r-name").focus();
 });
 function rosterClick(e){
   const b=e.target.closest("button[data-act]");if(!b)return;
