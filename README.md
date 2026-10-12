@@ -56,6 +56,18 @@ As admin, open **Team roster** and click **Import from Excel**. Choose `Cashiers
 
 Cloudflare's free plan allows 100,000 requests a day, far more than the log needs.
 
+## Other restaurants
+
+The app can hold separate logs for other restaurants. Each one has its own entries, team roster, Excel reports and manager passcode. The admin passcode opens all of them, with a switcher at the top.
+
+To add one:
+1. Open the site with `#setup` at the end of the address, fill in only **Other restaurant manager passcode**, and click **Create**.
+2. In `config.js`, add an entry to `extraLogs` with an `id` (short, no spaces), the restaurant `name`, `outlets` (leave `[]` for one location) and the `managerPasscodeHash` from step 1.
+3. In the Cloudflare worker, add a Secret named for the restaurant ending in `_PASSCODE` (for example `UMI_PASSCODE`) with that same passcode, and deploy.
+4. Sign in as admin, switch to the restaurant, and load its roster with **Import from Excel** when ready.
+
+Existing food court entries stay in the Food Court log. No Firestore rule changes are needed.
+
 ## Everyday use
 
 - **Managers** open the site on their phone, enter the manager passcode once (the phone remembers it), and tap **Take photo**.

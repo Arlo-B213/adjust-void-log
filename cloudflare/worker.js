@@ -8,6 +8,8 @@
  *   ANTHROPIC_API_KEY  your key from console.anthropic.com (starts with sk-ant-api)
  *   MANAGER_PASSCODE   the manager passcode the team uses to open the log
  *   ADMIN_PASSCODE     the admin passcode
+ *   Add one more *_PASSCODE secret for each other restaurant's manager passcode,
+ *   e.g. RESTAURANT_PASSCODE. Any secret whose name ends in _PASSCODE is accepted.
  *
  * Opening the worker's URL in a browser shows {"ok":true,...} when it's running.
  */
@@ -37,7 +39,8 @@ export default {
         ok: true,
         service: 'Adjust & Void Log photo reader',
         apiKeySet: Boolean(env.ANTHROPIC_API_KEY),
-        passcodesSet: Boolean(env.MANAGER_PASSCODE && env.ADMIN_PASSCODE)
+        passcodesSet: Boolean(env.MANAGER_PASSCODE && env.ADMIN_PASSCODE),
+        passcodeCount: Object.keys(env).filter(k => k.endsWith('_PASSCODE')).length
       });
     }
 
@@ -45,7 +48,7 @@ export default {
 
     try {
       const req = JSON.parse(await request.text());
-      const allowed = [env.MANAGER_PASSCODE, env.ADMIN_PASSCODE].filter(Boolean);
+      const allowed = Object.keys(env).filter(k => k.endsWith('_PASSCODE')).map(k => String(env[k])).filter(Boolean);
       if (!req.key || !allowed.includes(String(req.key))) return reply({ error: 'unauthorized' });
       if (!req.image || !req.prompt) return reply({ error: 'missing_photo' });
       if (!env.ANTHROPIC_API_KEY) return reply({ error: 'ANTHROPIC_API_KEY is not set in the worker settings' });

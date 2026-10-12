@@ -134,6 +134,9 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
 .rp .bd{font-family:var(--f-mono);font-size:12px;color:var(--muted);white-space:nowrap}
 .rp .acts{display:flex;gap:10px;flex-shrink:0}
 .head-side{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.logsw{display:flex;gap:4px;padding:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px;max-width:100%;overflow-x:auto}
+.logsw button{border:0;background:none;color:var(--muted);font:600 14px var(--f-body);padding:8px 14px;border-radius:7px;cursor:pointer;white-space:nowrap;min-height:40px}
+.logsw button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.15);outline:1px solid var(--line)}
 .cards{display:none}
 .tabbar{display:none}
 /* ---------- Phones ---------- */
@@ -147,6 +150,8 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
   .head-side{align-items:stretch}
   .who{justify-content:flex-start}
   .who .linkbtn{margin-left:auto}
+  .logsw{display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
+  .logsw[hidden]{display:none}
   .filters{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .filters select{width:100%}
   #f-range{grid-column:1/-1}
@@ -198,7 +203,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
 
 <div class="lock" id="lock">
   <form class="lock-card" id="lock-form" novalidate>
-    <div class="eyebrow">Pechanga Food Court · Manager Controls</div>
+    <div class="eyebrow">Pechanga Resort Casino · Manager Controls</div>
     <h1 style="margin:0">Adjust &amp; Void Log</h1>
     <label>Passcode<input id="lock-pass" class="mono pc" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" id="lock-remember" checked style="width:auto"> Remember this device</label>
@@ -211,9 +216,10 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
     <p class="note" style="margin:0">Managers use the manager passcode. The admin passcode also opens the team roster and adds names and badges to the Excel report. Use 6 or more letters or numbers, like FC1234. Passcodes are case-sensitive.</p>
     <label>Manager passcode<input id="setup-m" class="mono" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <label>Admin passcode<input id="setup-a" class="mono" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
+    <label>Other restaurant manager passcode <small>optional</small><input id="setup-r" class="mono" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"></label>
     <button class="btn" type="submit">Create</button>
     <span class="status" id="setup-status" role="status"></span>
-    <div id="setup-out" hidden><p class="note" style="margin:0 0 6px">Paste these two lines into <b>config.js</b>, replacing the empty ones, then commit:</p><pre id="setup-pre"></pre></div>
+    <div id="setup-out" hidden><p class="note" style="margin:0 0 6px">Send these lines to whoever maintains config.js (or paste them in yourself):</p><pre id="setup-pre"></pre></div>
   </form>
 </div>
 
@@ -241,12 +247,13 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
 <div class="wrap" id="app" hidden>
   <header>
     <div>
-      <div class="eyebrow">Pechanga Food Court · Manager Controls</div>
+      <div class="eyebrow" id="app-eyebrow">Pechanga Food Court · Manager Controls</div>
       <h1>Adjust &amp; Void Log</h1>
       <p class="sub hide-sm">Log every manager adjust, void, comp and refund with the check number and reason, so nothing lives only in handwriting on a receipt.</p>
     </div>
     <div class="head-side">
       <div class="who">Signed in as <b id="who-role">Manager</b> <button class="linkbtn" type="button" id="sign-out">Sign out</button></div>
+      <div class="logsw" id="log-switch" role="tablist" aria-label="Which log" hidden></div>
       <div class="filters" id="filters">
       <select id="f-range" aria-label="Month or date range"></select>
       <select id="f-outlet" aria-label="Outlet"><option value="">All outlets</option></select>
@@ -341,7 +348,11 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>document.write('<script src="config.js?v='+Date.now()+'"><\/script>')</script>
 <script>
-const OUTLETS=["Agave","American Classics","Café Cocoa's","Little Wok","Pechanga Fried Chicken","Pronto","Portable Smart Bar"];
+const FC_OUTLETS=["Agave","American Classics","Café Cocoa's","Little Wok","Pechanga Fried Chicken","Pronto","Portable Smart Bar"];
+/* Each log has its own entries, roster and reports. The food court is built in; more come from config.js (extraLogs). */
+const LOGS=[{id:"fc",name:"Food Court",outlets:FC_OUTLETS,managerHash:(window.CONFIG||{}).managerPasscodeHash}]
+  .concat(((window.CONFIG||{}).extraLogs||[]).filter(l=>l&&l.id&&l.name).map(l=>({id:String(l.id),name:String(l.name),outlets:(l.outlets&&l.outlets.length)?l.outlets.map(String):[String(l.name)],managerHash:l.managerPasscodeHash||""})));
+let LOG=LOGS[0], OUTLETS=LOG.outlets, allowedLogs=[LOG], allRows=[];
 const TYPES=["Manager Adjust","Void","Comp","Discount","Refund"];
 const REASONS=["Guest changed mind","Rung in wrong","Duplicate ring","Food quality","Long wait","Kitchen error","Price correction","Guest recovery","Equipment test / calibration","Other"];
 const $=id=>document.getElementById(id);
@@ -531,7 +542,7 @@ $("entry").addEventListener("submit",async e=>{
     }finally{$("e-save").disabled=false}
     return;
   }
-  doc.loggedBy=role;doc.createdAt=new Date().toISOString();
+  doc.loggedBy=role;doc.createdAt=new Date().toISOString();doc.log=LOG.id;
   if(!confirmDup&&rows.some(r=>r.check===doc.check&&r.outlet===doc.outlet)){confirmDup=true;status(`Check ${doc.check} at ${doc.outlet} is already logged. Tap Log entry again to add it anyway.`,"err");return}
   confirmDup=false;
   try{localStorage.setItem("avl-mgr",doc.approvedBy);localStorage.setItem("avl-mgrbadge",doc.mgrBadge)}catch(e){}
@@ -549,7 +560,7 @@ $("entry").addEventListener("submit",async e=>{
     const mk=doc.when.slice(0,7), sel=$("f-range");
     let moved="";
     if(!(sel.value==="m:"+mk||sel.value==="all"||sel.value==="fy"&&inRange(doc))){
-      rows=rows.concat([{id:ref.id,...doc}]);buildRange();sel.value="m:"+mk;render();moved=` Showing ${monthLabel(mk)}, the month on the receipt.`;
+      allRows=allRows.concat([{id:ref.id,...doc}]);applyLogRows();buildRange();sel.value="m:"+mk;render();moved=` Showing ${monthLabel(mk)}, the month on the receipt.`;
     }
     status(`Logged check ${doc.check} · ${money(doc.amount)}.${moved}${photoNote}`,photoNote?"err":"ok");
     ["e-check","e-server","e-item","e-amount","e-notes"].forEach(id=>$(id).value="");
@@ -706,7 +717,7 @@ $("csv").addEventListener("click",async()=>{
   finally{btn.disabled=false;btn.textContent=label}
   const v=$("f-range").value;
   const name=v.startsWith("m:")?monthLabel(v.slice(2)).replace(" ","-"):v==="fy"?fyLabel():new Date().toISOString().slice(0,10);
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));a.download=`Adjust-Void-Report-${name}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}));a.download=`Adjust-Void-Report-${LOG.name.replace(/[^A-Za-z0-9]+/g,"-")}-${name}.xlsx`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
 });
 
 /* ---------- Roster (private: admin-only db path) ---------- */
@@ -783,13 +794,13 @@ async function buildReport(list,thumbs={}){
   const sum=a=>a.reduce((s,r)=>s+(+r.amount||0),0);
   const v=$("f-range").value, single=v.startsWith("m:");
   const scope=$("f-range").selectedOptions[0].text+($("f-outlet").value?" · "+$("f-outlet").value:"")+($("f-reason").value?" · "+$("f-reason").value:"");
-  const wb=new ExcelJS.Workbook();wb.creator="Pechanga Food Court";wb.created=new Date();
+  const wb=new ExcelJS.Workbook();wb.creator="Pechanga "+LOG.name;wb.created=new Date();
 
   /* ---------- Summary ---------- */
   const s=wb.addWorksheet("Summary",{properties:{tabColor:{argb:GOLD}},views:[{showGridLines:false}]});
   s.columns=[{width:34},{width:16},{width:18},{width:16},{width:16}];
   s.pageSetup={orientation:"portrait",fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:.5,right:.5,top:.6,bottom:.6,header:.3,footer:.3}};
-  s.mergeCells("A1:E1");const t=s.getCell("A1");t.value="Food Court Adjust & Void Report";t.font={name:"Calibri",size:18,bold:true,color:{argb:WHITE}};t.fill=fillC(NAVY);t.alignment={vertical:"middle",indent:1};s.getRow(1).height=34;
+  s.mergeCells("A1:E1");const t=s.getCell("A1");t.value=`${LOG.name} Adjust & Void Report`;t.font={name:"Calibri",size:18,bold:true,color:{argb:WHITE}};t.fill=fillC(NAVY);t.alignment={vertical:"middle",indent:1};s.getRow(1).height=34;
   s.mergeCells("A2:E2");const t2=s.getCell("A2");t2.value=scope+"  ·  Pechanga Resort Casino";t2.font={size:12,bold:true,color:{argb:GOLD}};t2.alignment={indent:1};s.getRow(2).height=20;
   s.mergeCells("A3:E3");const t3=s.getCell("A3");t3.value="Prepared "+new Date().toLocaleDateString("en-US",{month:"long",day:"numeric",year:"numeric"});t3.font={size:10,italic:true,color:{argb:GREY}};t3.alignment={indent:1};
 
@@ -827,7 +838,7 @@ async function buildReport(list,thumbs={}){
     tv.forEach((val,j)=>{const c=s.getCell(row,j+1);c.value=val;c.numFmt=[null,"0",MF,"0.0%",null][j]||"General";c.font={bold:true,color:{argb:NAVY}};c.alignment={horizontal:j?"center":"left",indent:j?0:1};c.border={top:{style:"thin",color:{argb:NAVY}}}});
     row+=2;
   }
-  section("Outlet","outlet");
+  if(OUTLETS.length>1)section("Outlet","outlet");
   section("Reason","reason");
   section("Type","type");
   section("Approving Manager","_mgr");
@@ -916,7 +927,13 @@ $("r-import").addEventListener("change",async e=>{
 /* ---------- Passcodes, Firebase, start ---------- */
 let role="manager", passcode="";
 const sha=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,"0")).join("");
-async function roleFor(p){const h=await sha(p);return h===CONFIG.adminPasscodeHash?"admin":h===CONFIG.managerPasscodeHash?"manager":null}
+async function roleFor(p){
+  const h=await sha(p);
+  if(h===CONFIG.adminPasscodeHash){allowedLogs=LOGS.slice();return "admin"}
+  const l=LOGS.find(x=>x.managerHash&&x.managerHash===h);
+  if(l){allowedLogs=[l];return "manager"}
+  return null;
+}
 async function openReceiptFromLink(){
   const m=location.hash.match(/^#receipt-([A-Za-z0-9_-]+)$/);if(!m)return;
   history.replaceState(null,"",location.pathname);
@@ -937,20 +954,54 @@ if("IntersectionObserver" in window){
     if(best)document.querySelectorAll("#tabbar [data-go]").forEach(b=>b.classList.toggle("on",b.dataset.go===best))},{threshold:[0,.15,.3,.5,.75,1]});
   ["sec-new","sec-log","sec-sum"].forEach(id=>io.observe($(id)));
 }
+function setOutletOptions(){
+  fill($("e-outlet"),OUTLETS);fill($("f-outlet"),OUTLETS,"All outlets");
+  const one=OUTLETS.length<2;
+  $("f-outlet").hidden=one;$("e-outlet").closest("label").hidden=one;
+  const bo=$("b-outlet");bo.hidden=one;bo.previousElementSibling.hidden=one;
+}
+let rosterUnsub=null;
+function loadRoster(){
+  if(rosterUnsub){rosterUnsub();rosterUnsub=null}
+  roster=[];rosterReady=false;rosterDoc=null;$("roster").hidden=true;
+  if(role!=="admin"||!db)return;
+  const logId=LOG.id;
+  sha(logId==="fc"?"roster:"+passcode:"roster:"+logId+":"+passcode).then(id=>{
+    if(LOG.id!==logId)return;
+    rosterDoc=db.collection("roster").doc(id.slice(0,40));
+    rosterUnsub=rosterDoc.onSnapshot(sn=>{const p=sn.exists?sn.data().people:null;roster=Array.isArray(p)?p.map(x=>({...x})):[];rosterReady=true;$("roster").hidden=false;renderRoster()},()=>{});
+  });
+}
+function applyLogRows(){rows=allRows.filter(r=>(r.log||"fc")===LOG.id)}
+function switchLog(id){
+  const next=allowedLogs.find(l=>l.id===id)||allowedLogs[0];
+  LOG=next;OUTLETS=LOG.outlets;
+  try{localStorage.setItem("avl-log",LOG.id)}catch(e){}
+  $("app-eyebrow").textContent=`Pechanga ${LOG.name} · Manager Controls`;
+  document.title=`Adjust & Void Log · ${LOG.name}`;
+  document.querySelectorAll("#log-switch button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.log===LOG.id)));
+  if(editingId)cancelEdit();
+  setOutletOptions();$("f-outlet").value="";
+  applyLogRows();buildRange();render();loadRoster();
+  $("r-search").value="";status("");
+}
+function buildLogSwitch(){
+  const sw=$("log-switch");
+  sw.innerHTML=allowedLogs.map(l=>`<button type="button" role="tab" data-log="${esc(l.id)}" aria-selected="false">${esc(l.name)}</button>`).join("");
+  sw.hidden=allowedLogs.length<2;
+}
+$("log-switch").addEventListener("click",e=>{const b=e.target.closest("[data-log]");if(b&&b.dataset.log!==LOG.id)switchLog(b.dataset.log)});
 function start(){
   $("lock").hidden=true;$("app").hidden=false;$("tabbar").hidden=false;
-  $("who-role").textContent=role==="admin"?"Admin":"Manager";
+  $("who-role").textContent=role==="admin"?"Admin":(allowedLogs[0].id==="fc"?"Manager":`${allowedLogs[0].name} manager`);
   try{firebase.app()}catch(e){firebase.initializeApp(CONFIG.firebase)}
   db=firebase.firestore();
   render();
   openReceiptFromLink();
-  db.collection("adjustments").onSnapshot(s=>{rows=s.docs.map(x=>({id:x.id,...x.data()}));buildRange();render()},()=>{db=null;render();status("Lost connection to the log. Reload the page.","err")});
-  if(role==="admin"){
-    sha("roster:"+passcode).then(id=>{
-      rosterDoc=db.collection("roster").doc(id.slice(0,40));
-      rosterDoc.onSnapshot(sn=>{const p=sn.exists?sn.data().people:null;roster=Array.isArray(p)?p.map(x=>({...x})):[];rosterReady=true;$("roster").hidden=false;renderRoster()},()=>{});
-    });
-  }
+  buildLogSwitch();
+  let want=null;try{want=localStorage.getItem("avl-log")}catch(e){}
+  switchLog(allowedLogs.some(l=>l.id===want)?want:allowedLogs[0].id);
+  db.collection("adjustments").onSnapshot(s=>{allRows=s.docs.map(x=>({id:x.id,...x.data()}));applyLogRows();buildRange();render()},()=>{db=null;render();status("Lost connection to the log. Reload the page.","err")});
 }
 $("sign-out").addEventListener("click",()=>{try{localStorage.removeItem("avl-pass")}catch(e){}location.reload()});
 $("lock-form").addEventListener("submit",async e=>{
@@ -963,15 +1014,22 @@ $("lock-form").addEventListener("submit",async e=>{
 });
 $("setup-form").addEventListener("submit",async e=>{
   e.preventDefault();
-  const m=$("setup-m").value.trim(), a=$("setup-a").value.trim(), st=$("setup-status");
-  if(m.length<6||a.length<6){st.textContent="Use at least 6 characters for each passcode.";st.className="status err";return}
-  if(m===a){st.textContent="The two passcodes need to be different.";st.className="status err";return}
-  $("setup-pre").textContent=`managerPasscodeHash: "${await sha(m)}",\nadminPasscodeHash: "${await sha(a)}",`;
+  const m=$("setup-m").value.trim(), a=$("setup-a").value.trim(), r=$("setup-r").value.trim(), st=$("setup-status");
+  const given=[m,a,r].filter(Boolean);
+  if(!given.length){st.textContent="Enter at least one passcode.";st.className="status err";return}
+  if(given.some(x=>x.length<6)){st.textContent="Use at least 6 characters for each passcode.";st.className="status err";return}
+  if(new Set(given).size!==given.length){st.textContent="Each passcode needs to be different.";st.className="status err";return}
+  const out=[];
+  if(m)out.push(`managerPasscodeHash: "${await sha(m)}",`);
+  if(a)out.push(`adminPasscodeHash: "${await sha(a)}",`);
+  if(r)out.push(`restaurant managerPasscodeHash: "${await sha(r)}"`);
+  $("setup-pre").textContent=out.join("\n");
   $("setup-out").hidden=false;st.textContent="Keep the passcodes somewhere safe. They can't be recovered from these lines.";st.className="status";
 });
 (async()=>{
   if(!window.CONFIG||!CONFIG.firebase||!CONFIG.firebase.projectId){$("lock-status").textContent="Firebase isn't set up yet. Fill in config.js using the setup guide.";$("lock-status").className="status err";return}
   if(!CONFIG.managerPasscodeHash||!CONFIG.adminPasscodeHash||/^#?setup$/.test(location.hash)){$("lock-form").hidden=true;$("setup-form").hidden=false;return}
+  setOutletOptions();
   let saved=null;try{saved=localStorage.getItem("avl-pass")}catch(e){}
   if(saved){const r=await roleFor(saved);if(r){role=r;passcode=saved;start();return}}
   $("lock-pass").focus();
