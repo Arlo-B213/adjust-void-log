@@ -9,7 +9,7 @@ Pechanga Food Court log for manager adjusts, voids, comps, discounts and refunds
 | `index.html` | The app itself |
 | `config.js` | Your Firebase settings, passcodes and photo reader URL |
 | `firestore.rules` | Database security rules to paste into Firebase |
-| `apps-script/Code.gs` | The photo reader, which runs in Google Apps Script and keeps your Claude API key private |
+| `cloudflare/worker.js` | The photo reader, which runs on Cloudflare's free Workers plan and keeps your Claude API key private |
 
 Everything runs on free tiers except the photo reading, which is billed per receipt by Anthropic.
 
@@ -40,18 +40,21 @@ Everything runs on free tiers except the photo reading, which is billed per rece
 
 As admin, open **Team roster** and click **Import from Excel**. Choose `Cashiers_name_and_badges.xlsx` (names in one column, badges in the next). Use **Add** and **Remove** from then on.
 
-### 5. Photo reader (optional but recommended)
+### 5. Photo reader (Cloudflare Worker, free)
 
-1. Get an API key at [console.anthropic.com](https://console.anthropic.com) (**API Keys > Create Key**) and add a little credit under **Billing**.
-2. Go to [script.google.com](https://script.google.com), click **New project**, delete the sample code, and paste in `apps-script/Code.gs`.
-3. Open **Project Settings** (gear icon) **> Script Properties** and add three properties:
+1. Get an API key at [console.anthropic.com](https://console.anthropic.com) (**API Keys > Create Key**; it starts with `sk-ant-api`) and add a little credit under **Billing**.
+2. Create a free account at [dash.cloudflare.com](https://dash.cloudflare.com/sign-up).
+3. Go to **Compute (Workers) > Workers & Pages > Create > Create Worker** (start from "Hello World"), name it `adjust-void-reader`, and click **Deploy**.
+4. Click **Edit code**, delete the sample, paste in all of `cloudflare/worker.js`, and click **Deploy**.
+5. Go back to the worker, open **Settings > Variables and Secrets**, and add three, each with type **Secret**:
    - `ANTHROPIC_API_KEY`: your key
    - `MANAGER_PASSCODE`: the manager passcode
    - `ADMIN_PASSCODE`: the admin passcode
-4. Click **Deploy > New deployment**, choose **Web app**, set **Execute as: Me** and **Who has access: Anyone**, then **Deploy**. Approve the permissions prompt.
-5. Copy the web app URL (it ends in `/exec`) into `photoReaderUrl` in `config.js` and commit.
+   Click **Deploy** (or **Save**) after adding them.
+6. Open the worker's URL (`https://adjust-void-reader.<your-name>.workers.dev`). It should show `{"ok":true,...,"apiKeySet":true,"passcodesSet":true}`.
+7. Put that URL in `photoReaderUrl` in `config.js` and commit.
 
-Opening that URL in a browser should show `{"ok":true,...}`.
+Cloudflare's free plan allows 100,000 requests a day, far more than the log needs.
 
 ## Everyday use
 
@@ -63,6 +66,6 @@ Opening that URL in a browser should show `{"ok":true,...}`.
 
 - **Passcodes:** the passcode screen keeps casual visitors out. The log entries themselves are in a database whose address is in `config.js`, so a technical person with the repo link could read them. That's why the repo should stay **private** if your GitHub plan allows Pages on private repos; otherwise keep the link to your team.
 - **Roster privacy:** the roster is stored under an address calculated from the admin passcode, and the rules block listing it. Without the admin passcode it can't be found.
-- **Changing the admin passcode** moves the roster to a new address. Before changing it, download a report or keep your roster spreadsheet, then re-import after the change. Update the Apps Script properties too.
+- **Changing the admin passcode** moves the roster to a new address. Before changing it, download a report or keep your roster spreadsheet, then re-import after the change. Update the passcodes in the Cloudflare worker's Variables and Secrets too.
 - **Photos** are never stored. They're sent to the photo reader once to fill in the form, then discarded.
-- **Model:** the photo reader uses `claude-haiku-5-5` (a fraction of a cent per receipt). If it misreads handwriting, change `MODEL` in `Code.gs` to `claude-sonnet-5-5` and redeploy (**Deploy > Manage deployments > Edit > New version**).
+- **Model:** the photo reader uses `claude-haiku-5-5` (a fraction of a cent per receipt). If it misreads handwriting, change `MODEL` at the top of the worker code to `claude-sonnet-5-5` and click **Deploy** in the Cloudflare editor.

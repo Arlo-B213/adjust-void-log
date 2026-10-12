@@ -458,12 +458,12 @@ Handwriting can be messy; give your best reading. Use "" for anything you cannot
     snapState("Filled in from the photo","Check the highlighted fields, then tap Log entry at the bottom to add it to the log.");
     status("");
   }catch(err){
-    if(err&&err.message==="unauthorized")snapState("Photo attached","The photo reader didn't accept this passcode. Ask your admin to check the Apps Script settings, or type the details below.");
+    if(err&&err.message==="unauthorized")snapState("Photo attached","The photo reader didn't accept this passcode. Ask your admin to check MANAGER_PASSCODE and ADMIN_PASSCODE in the Cloudflare worker, or type the details below.");
     else{
       const m=String(err&&err.message||err), l=m.toLowerCase(); let why;
-      if(l.startsWith("network"))why="Couldn't reach the photo reader. In Apps Script, check the deployment's Who has access is set to Anyone.";
-      else if(l.startsWith("not_json"))why="The photo reader sent back a Google page instead of an answer. In Apps Script, set Who has access to Anyone and redeploy.";
-      else if(/x-api-key|authentication|api key|invalid.*key|permission/.test(l))why="The Claude API key was rejected. Create a new standard API key and paste it into ANTHROPIC_API_KEY in Script Properties.";
+      if(l.startsWith("network"))why="Couldn't reach the photo reader. Check your connection and try again.";
+      else if(l.startsWith("not_json"))why="The photo reader sent back an unexpected page instead of an answer. Check the photo reader link in config.js.";
+      else if(/x-api-key|authentication|api key|invalid.*key|permission/.test(l))why="The Claude API key was rejected. Create a new standard API key and paste it into ANTHROPIC_API_KEY in the Cloudflare worker's Variables and Secrets.";
       else if(/credit|billing|balance/.test(l))why="Your Claude account is out of credit. Add credit in the Anthropic Console.";
       else if(/model/.test(l))why="The photo reader's model name wasn't accepted.";
       else if(l==="no_result")why="The receipt couldn't be read. Try a sharper shot with the whole receipt in frame.";
@@ -669,9 +669,9 @@ async function readViaScript(prompt,blob){
   try{res=await fetch(CONFIG.photoReaderUrl,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({key:passcode,prompt,image:await toB64(blob)})})}
   catch(e){
     let reach="";
-    try{const g=await fetch(CONFIG.photoReaderUrl);const t=await g.text();reach=/"ok":true/.test(t)?" (the reader answers simple checks, so the script is crashing on photos: run testSetup in Apps Script, then deploy a new version)":" (the reader isn't answering at all: check the deployment is set to Anyone)"}catch(e2){reach=" (the reader isn't answering at all: check the deployment is set to Anyone)"}
-    const id=(CONFIG.photoReaderUrl.match(/\/s\/([^/]+)/)||[])[1]||"?";
-    throw new Error("network: "+(e.message||e)+reach+" [reader …"+id.slice(-6)+", "+(navigator.onLine?"online":"offline")+"]")
+    try{const g=await fetch(CONFIG.photoReaderUrl);const t=await g.text();reach=/"ok":true/.test(t)?" (the reader answers simple checks but failed on the photo; try again)":" (the reader isn't answering; check the photo reader link in config.js)"}catch(e2){reach=" (the reader isn't answering; check the photo reader link in config.js)"}
+    const host=(CONFIG.photoReaderUrl.match(/^https?:\/\/([^/]+)/)||[])[1]||"?";
+    throw new Error("network: "+(e.message||e)+reach+" ["+host+", "+(navigator.onLine?"online":"offline")+"]")
   }
   const text=await res.text();let j;
   try{j=JSON.parse(text)}catch(e){throw new Error("not_json: "+text.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim().slice(0,120))}

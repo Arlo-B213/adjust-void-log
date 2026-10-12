@@ -14,6 +14,6 @@ window.CONFIG = {
   managerPasscodeHash: "8c13311fd4e75ba9bc3f9a958fe40ea03f0e55c5c5b4ce2b82ffdb134f6bfd41",
   adminPasscodeHash: "85ce990e5e9ce868b573df041c8d7430fed5bbdb92b14bd486c8a34f88904cf1",
 
-  // Google Apps Script web app URL (ends in /exec). Leave empty to skip automatic photo reading.
-  photoReaderUrl: "https://script.google.com/macros/s/AKfycbyNcCRP8q6GJhnzajnKuYaOeqy9-8K0XEa2co7i8BuIXwdc9WOfsxKErRukUQS8hDd8fA/exec"
+  // Cloudflare Worker URL for the photo reader (ends in .workers.dev). Leave empty to skip automatic photo reading.
+  photoReaderUrl: ""
 };
