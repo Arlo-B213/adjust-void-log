@@ -723,13 +723,20 @@ $("csv").addEventListener("click",async()=>{
 /* ---------- Roster (private: admin-only db path) ---------- */
 let roster=[], rosterDoc=null, rosterReady=false, rosterQ=Promise.resolve(), rPending=null;
 const SUFFIX=/^(jr\.?|sr\.?|ii|iii|iv)$/i;
-function nameParts(n){const t=String(n).trim().toLowerCase().split(/\s+/).filter(Boolean);while(t.length>1&&SUFFIX.test(t[t.length-1]))t.pop();return t}
+function nameParts(n){const t=String(n).replace(/["“”(][^"“”)]*["“”)]/g," ").replace(/[^\p{L}\p{N}\s'.-]/gu," ").trim().toLowerCase().split(/\s+/).filter(Boolean);while(t.length>1&&SUFFIX.test(t[t.length-1]))t.pop();return t}
+/* Roster files list names as "First Last" or "Last, First", sometimes with a "Nickname" in quotes. */
+function normalizeName(raw){
+  let s=String(raw).replace(/\s+/g," ").trim(), nick="";
+  const q=s.match(/["“”]([^"“”]+)["“”]/);if(q){nick=q[1].trim();s=s.replace(q[0]," ").replace(/\s+/g," ").trim()}
+  if(s.includes(",")){const [last,...rest]=s.split(",");const first=rest.join(" ").trim();if(first)s=`${first} ${last.trim()}`}
+  return {name:s.replace(/\s+/g," ").trim(),nick};
+}
 function matchCashier(text){
   if(!roster.length||!text)return null;
   const m=String(text).trim().match(/^(\d+)?\s*(.*)$/), num=m[1], parts=nameParts(m[2]||"");
   if(!parts.length)return null;
   const first=parts[0], li=parts.length>1?parts[parts.length-1][0]:"";
-  const c=roster.filter(p=>{const t=nameParts(p.name);return t[0]===first&&(!li||t[t.length-1][0]===li)});
+  const c=roster.filter(p=>{const t=nameParts(p.name),firsts=[t[0],String(p.nick||"").toLowerCase()].filter(Boolean);return firsts.includes(first)&&(!li||t[t.length-1][0]===li)});
   const act=c.filter(p=>p.active!==false);
   return act.length===1?act[0]:c.length===1?c[0]:null;
 }
@@ -748,7 +755,7 @@ function renderRoster(){
   const show=a=>a.filter(p=>!q||p.name.toLowerCase().includes(q)||String(p.badge).includes(q));
   $("r-count").textContent=`${act.length} active`;
   $("r-former-n").textContent=old.length;$("r-former-wrap").hidden=!old.length;
-  const card=(p,former)=>`<div class="rp"><span class="nm" title="${esc(p.name)}">${esc(p.name)}</span><span class="bd">#${esc(p.badge)}</span><span class="acts">${former
+  const card=(p,former)=>`<div class="rp"><span class="nm" title="${esc(p.name)}">${esc(p.name)}${p.nick?` <span class="note">(${esc(p.nick)})</span>`:""}</span><span class="bd">#${esc(p.badge)}</span><span class="acts">${former
     ?`<button class="del" data-act="restore" data-b="${esc(p.badge)}">Restore</button><button class="del ${rPending==="d"+p.badge?"confirm":""}" data-act="delete" data-b="${esc(p.badge)}">${rPending==="d"+p.badge?"Confirm":"Delete"}</button>`
     :`<button class="del ${rPending==="r"+p.badge?"confirm":""}" data-act="remove" data-b="${esc(p.badge)}">${rPending==="r"+p.badge?"Confirm remove":"Remove"}</button>`}</span></div>`;
   const a=show(act);$("r-list").innerHTML=a.length?a.map(p=>card(p,false)).join(""):`<div class="note">${q?"No one matches that search.":"No one on the roster yet. Add your first cashier above."}</div>`;
@@ -915,7 +922,7 @@ $("r-import").addEventListener("change",async e=>{
       const cells=r.values.slice(1).map(v=>v&&typeof v==="object"?(v.text??v.result??""):v);
       const name=cells.find(v=>typeof v==="string"&&/[a-z]/i.test(v)&&!/^(name|cashier|badge)$/i.test(v.trim()));
       const badge=cells.find(v=>/^\d{3,}$/.test(String(v??"").trim()));
-      if(name&&badge)found.push({name:name.trim().replace(/\s+/g," "),badge:String(badge).trim(),pos:"",active:true});
+      if(name&&badge){const n=normalizeName(name);found.push({name:n.name,nick:n.nick,badge:String(badge).trim(),pos:"",active:true})}
     });
     const have=new Set(roster.map(p=>String(p.badge))), add=found.filter(p=>!have.has(p.badge));
     if(!found.length){rs.textContent="No names and badge numbers found. Put names in one column and badges in the next.";rs.className="status err";return}
