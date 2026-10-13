@@ -17,7 +17,7 @@ window.CONFIG = {
   // Other restaurants, each with its own log, roster and manager passcode.
   // outlets: leave [] for a single-location restaurant. managerPasscodeHash: from the #setup screen.
   extraLogs: [
-    { id: "r1", name: "Restaurant", outlets: [], managerPasscodeHash: "" }
+    { id: "r1", name: "Blends", outlets: [], managerPasscodeHash: "73a9e7949916712677c4b6c52d9987fc4ddbb3339e799b444034532cb02fc21b" }
   ],
 
   // Cloudflare Worker URL for the photo reader (ends in .workers.dev). Leave empty to skip automatic photo reading.
