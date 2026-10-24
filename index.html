@@ -83,6 +83,7 @@ td.num,th.num{text-align:right;font-family:var(--f-mono);font-variant-numeric:ta
 .snap{grid-column:1/-1;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"ico txt" "btns btns";gap:12px 14px;align-items:center;border:2px dashed var(--accent);background:var(--accent-soft);border-radius:8px;padding:14px}
 .snap .ico{grid-area:ico}.snap-txt{grid-area:txt;min-width:0}
 .snap-btns{grid-area:btns;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.snap-btns .paste-btn{grid-column:1/-1;min-height:40px;font-size:14px;background:transparent;border-style:dashed}
 .snap-btn{display:flex;align-items:center;justify-content:center;min-height:46px;font-size:15px;text-align:center}
 .snap-btn.ghost{background:var(--surface)}
 .snap.drag{border-style:solid}
@@ -275,10 +276,11 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
       <form class="form" id="entry" novalidate>
         <div class="snap" id="snap">
           <div class="ico" id="snap-thumb">RECEIPT</div>
-          <div class="snap-txt"><b id="snap-title">Snap the receipt</b><span id="snap-msg">Take a photo or upload one. The form fills itself in; you check it and tap Log. The photo is saved with the entry.</span></div>
+          <div class="snap-txt"><b id="snap-title">Snap the receipt</b><span id="snap-msg">Take, upload or paste a photo. The form fills itself in; you check it and tap Log. The photo is saved with the entry.</span></div>
           <div class="snap-btns">
             <button type="button" class="btn snap-btn" id="take-photo">Take photo</button>
             <label class="btn ghost snap-btn" for="e-photo">Upload photo</label>
+            <button type="button" class="btn ghost snap-btn paste-btn" id="paste-photo">Paste photo <span class="hide-sm">(or press Ctrl+V / ⌘V)</span></button>
           </div>
           <input type="file" id="e-cam" accept="image/*" capture="environment" class="vh" tabindex="-1">
           <input type="file" id="e-photo" accept="image/*" class="vh" tabindex="-1">
@@ -575,7 +577,7 @@ let photoBlob=null, photoData="", thumbUrl="", confirmDup=false;
 try{const m=localStorage.getItem("avl-mgr");if(m)$("e-mgr").value=m;const mb=localStorage.getItem("avl-mgrbadge");if(mb)$("e-mgrbadge").value=mb}catch(e){}
 
 function snapState(title,msg){$("snap-title").textContent=title;$("snap-msg").textContent=msg}
-function resetSnap(){photoBlob=null;photoData="";if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=""}$("snap-thumb").textContent="RECEIPT";snapState("Snap the next receipt","Take a photo or upload one. The form fills itself in; you check it and tap Log. The photo is saved with the entry.")}
+function resetSnap(){photoBlob=null;photoData="";if(thumbUrl){URL.revokeObjectURL(thumbUrl);thumbUrl=""}$("snap-thumb").textContent="RECEIPT";snapState("Snap the next receipt","Take, upload or paste a photo. The form fills itself in; you check it and tap Log. The photo is saved with the entry.")}
 /* One small copy of the photo, made once: phone cameras produce 12+ megapixel images,
    so decode once, draw at most 1600px, then free everything to avoid low-memory errors. */
 async function shrink(file){
@@ -694,6 +696,27 @@ $("cam-shot").addEventListener("click",async()=>{
 });
 document.addEventListener("visibilitychange",()=>{if(document.hidden&&camStream)camStop()});
 
+/* Paste a copied photo: Ctrl+V / Cmd+V anywhere in the app, or the Paste photo button. */
+function scrollToForm(){$("sec-new").scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"start"})}
+document.addEventListener("paste",e=>{
+  if($("app").hidden)return;
+  const it=[...((e.clipboardData&&e.clipboardData.items)||[])].find(i=>i.kind==="file"&&/^image\//.test(i.type));
+  const f=it&&it.getAsFile();if(!f)return;   // plain text pastes into fields as usual
+  e.preventDefault();scrollToForm();readReceipt(f);
+});
+$("paste-photo").addEventListener("click",async()=>{
+  if(!navigator.clipboard||!navigator.clipboard.read){snapState("Paste with your keyboard","Press Ctrl+V (⌘V on a Mac) to paste the copied photo.");return}
+  try{
+    const items=await navigator.clipboard.read();
+    for(const item of items){
+      const t=item.types.find(x=>/^image\//.test(x));
+      if(t){const b=await item.getType(t);readReceipt(new File([b],"pasted."+(t.split("/")[1]||"png"),{type:t}));return}
+    }
+    snapState("No photo copied","Copy a receipt photo first (in Photos, Messages or email: long-press the photo, then Copy), then tap Paste photo.");
+  }catch(err){
+    snapState("Couldn't paste","Tap Allow if your phone asks to paste, or press Ctrl+V (⌘V on a Mac). You can also use Upload photo.");
+  }
+});
 ["e-photo","e-cam"].forEach(id=>$(id).addEventListener("change",e=>{const f=e.target.files[0];e.target.value="";if(f)readReceipt(f)}));
 const snapEl=$("snap");
 ["dragenter","dragover"].forEach(t=>snapEl.addEventListener(t,e=>{e.preventDefault();snapEl.classList.add("drag")}));
