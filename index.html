@@ -158,7 +158,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
   #f-range{grid-column:1/-1}
   /* section order: entry form first, then log, then summary */
   .grid{display:contents}
-  #sec-new{order:1} #sec-log{order:2} #sec-sum{order:3} #sec-break{order:4} #roster{order:5}
+  #sec-new{order:1} #sec-log{order:2} #sec-credit{order:3} #sec-sum{order:4} #sec-break{order:5} #roster{order:6}
   section,details.roster{scroll-margin-top:12px}
   .panel{padding:14px;border-radius:10px}
   .stat{padding:12px}
@@ -173,7 +173,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
   #csv{min-height:46px}
   .tablewrap{display:none}
   .cards{display:grid;gap:10px}
-  .tabbar{display:grid;grid-template-columns:repeat(3,1fr);position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
+  .tabbar{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
   .tabbar[hidden]{display:none}
   .tabbar button{display:grid;justify-items:center;gap:2px;background:none;border:0;color:var(--muted);font:600 12px var(--f-body);padding:6px 0;min-height:52px;cursor:pointer;border-radius:8px}
   .tabbar button svg{width:24px;height:24px}
@@ -181,6 +181,40 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
   .rlist{grid-template-columns:1fr}
 }
 /* log entry cards (phones) */
+/* guest credits */
+.cr-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.cr-open-total{font:600 14px var(--f-mono);color:var(--accent)}
+.cform{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.cform .full{grid-column:span 2}
+.cform .row-actions{grid-column:1/-1}
+.cr-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.seg button{border:0;background:none;color:var(--muted);font:600 13px var(--f-body);padding:7px 12px;border-radius:7px;cursor:pointer;min-height:36px;white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);outline:1px solid var(--line)}
+.crlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
+.cr{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:12px 14px;display:grid;gap:6px;min-width:0}
+.cr.open{border-left:4px solid var(--accent)}
+.cr.done{opacity:.85;border-left:4px solid var(--ok)}
+.cr-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.cr-name{font-weight:700;font-size:16px;min-width:0;overflow-wrap:anywhere}
+.cr-amt{font:600 18px var(--f-mono);color:var(--accent);white-space:nowrap}
+.cr.done .cr-amt{color:var(--muted);text-decoration:line-through}
+.cr-meta{color:var(--muted);font-size:13px;overflow-wrap:anywhere}
+.cr-meta a{color:inherit}
+.cr-status{font:600 12px var(--f-mono);letter-spacing:.04em}
+.cr.open .cr-status{color:var(--accent)}
+.cr.done .cr-status{color:var(--ok)}
+.chip.go{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.go.confirm{background:var(--ok);border-color:var(--ok);color:#fff}
+@media (max-width:700px){
+  .cform{grid-template-columns:1fr 1fr}
+  .cform .full,.cform .row-actions{grid-column:1/-1}
+  .cform .row-actions{flex-direction:column;align-items:stretch}
+  .cform .row-actions .btn{min-height:52px;font-size:16px;width:100%}
+  .cr-tools{grid-template-columns:1fr}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr)}
+  .crlist{grid-template-columns:1fr}
+}
 .lc{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:12px 14px;display:grid;gap:6px;min-width:0}
 .lc.void{border-left:4px solid var(--void)}
 .lc-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
@@ -242,6 +276,7 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
 <nav class="tabbar" id="tabbar" hidden aria-label="Sections">
   <button type="button" data-go="sec-new" class="on"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="13" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>New</button>
   <button type="button" data-go="sec-log"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 8h6M9 12h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Log</button>
+  <button type="button" data-go="sec-credit"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.8"/><path d="M7 14.5h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>Credits</button>
   <button type="button" data-go="sec-sum"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V5M19 20v-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Summary</button>
 </nav>
 
@@ -343,6 +378,28 @@ details.roster>summary span{font-size:13px;color:var(--muted)}
       </table>
     </div>
   </section>
+
+  <section class="panel" aria-labelledby="h-credit" id="sec-credit">
+    <div class="cr-head"><h2 id="h-credit">Guest credits</h2><span class="cr-open-total" id="cr-total"></span></div>
+    <form class="cform" id="cr-form" novalidate>
+      <label class="full">Guest name<input id="c-name" autocomplete="off" placeholder="Jane Smith"></label>
+      <label>Phone<input id="c-phone" type="tel" inputmode="tel" autocomplete="off" placeholder="(951) 555-0123"></label>
+      <label>Player card # <small>optional</small><input id="c-card" class="mono" inputmode="numeric" autocomplete="off" placeholder="1234567"></label>
+      <label>Credit amount<input id="c-amount" class="mono" type="number" min="0" step="0.01" inputmode="decimal" placeholder="12.50"></label>
+      <label>Outlet<select id="c-outlet"></select></label>
+      <label class="full">Why the credit<input id="c-reason" autocomplete="off" placeholder="Order was wrong; guest will come back tomorrow" list="c-reasons"></label>
+      <datalist id="c-reasons"><option value="Order was wrong"><option value="Item unavailable"><option value="Long wait"><option value="Food quality"><option value="Machine down"><option value="Guest had to leave before order was ready"></datalist>
+      <label class="full">Manager <small>issuing / collecting</small><input id="c-mgr" autocomplete="off" placeholder="Manager name"></label>
+      <div class="row-actions"><button class="btn primary" type="submit" id="c-save">Add credit</button><span class="status" id="c-status" role="status"></span></div>
+    </form>
+    <div class="cr-tools">
+      <input id="c-search" type="search" placeholder="Find by name, phone or player card" aria-label="Find a guest credit" autocomplete="off">
+      <div class="seg" role="group" aria-label="Show">
+        <button type="button" data-cf="open" aria-pressed="true">Open</button><button type="button" data-cf="done" aria-pressed="false">Collected</button><button type="button" data-cf="all" aria-pressed="false">All</button>
+      </div>
+    </div>
+    <div class="crlist" id="cr-list"></div>
+  </section>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
@@ -367,7 +424,7 @@ fill($("f-outlet"),OUTLETS,"All outlets");fill($("f-reason"),REASONS,"All reason
 function nowLocal(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
 $("e-when").value=nowLocal();
 
-let rows=[], db=null, me=null, canWrite=true, pendingDel=null;
+let credits=[], rows=[], db=null, me=null, canWrite=true, pendingDel=null;
 
 const curMonth=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")};
 function monthLabel(k,short){const [y,m]=k.split("-");return new Date(+y,+m-1,1).toLocaleDateString("en-US",{month:short?"short":"long",year:"numeric"})}
@@ -913,6 +970,26 @@ async function buildReport(list,thumbs={}){
     [10,11].forEach(j=>{const c=tr.getCell(j);c.font={bold:true,color:{argb:NAVY}};c.border={top:{style:"medium",color:{argb:NAVY}}};c.alignment={horizontal:"right"}});
     w.autoFilter={from:{row:4,column:1},to:{row:last,column:16}};
   });
+  /* ---------- Guest credits issued in the period ---------- */
+  const cl=credits.filter(c=>inRange({when:c.issuedAt})).sort((a,b)=>String(a.issuedAt).localeCompare(String(b.issuedAt)));
+  if(cl.length){
+    const g=wb.addWorksheet("Guest Credits",{properties:{tabColor:{argb:"FF2F7A4F"}},views:[{state:"frozen",ySplit:4,showGridLines:false}]});
+    const gh=["Issued","Guest","Phone","Player Card","Amount","Why","Outlet","Issued By","Status","Collected","Collected By"];
+    g.columns=[18,22,16,14,11,40,18,18,12,20,18].map(x=>({width:x}));
+    g.pageSetup={orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,printTitlesRow:"4:4",margins:{left:.4,right:.4,top:.5,bottom:.5,header:.3,footer:.3}};
+    g.mergeCells("A1:K1");const ga=g.getCell("A1");ga.value=`${LOG.name} · Guest Credits · ${scope}`;ga.font={size:16,bold:true,color:{argb:WHITE}};ga.fill=fillC(NAVY);ga.alignment={vertical:"middle",indent:1};g.getRow(1).height=28;
+    const openC=cl.filter(c=>c.status!=="collected");
+    g.mergeCells("A2:K2");const gb=g.getCell("A2");gb.value=`${cl.length} issued · ${money(sum(cl))}  ·  ${openC.length} still open · ${money(sum(openC))}`;gb.font={size:11,bold:true,color:{argb:GOLD}};gb.alignment={indent:1};
+    const ghr=g.getRow(4);gh.forEach((x,i)=>{const c=ghr.getCell(i+1);c.value=x;c.font={bold:true,color:{argb:WHITE},size:10};c.fill=fillC("FF2F7A4F");c.alignment={horizontal:i===4?"right":"left",vertical:"middle"}});ghr.height=20;
+    cl.forEach((c,i)=>{const x=g.getRow(5+i), done=c.status==="collected";
+      [fmtStamp(c.issuedAt),c.guest,fmtPhone(c.phone),c.card||"",+c.amount||0,c.reason,c.outlet||"",c.issuedBy||"",done?"Collected":"Open",done?fmtStamp(c.collectedAt):"",done?(c.collectedBy||""):""]
+        .forEach((val,j)=>{const cell=x.getCell(j+1);cell.value=val;cell.border={bottom:thin};cell.alignment={vertical:"top",wrapText:j===5,horizontal:j===4?"right":"left"};if(i%2)cell.fill=fillC(BAND)});
+      x.getCell(5).numFmt=MF;x.getCell(9).font={bold:true,color:{argb:done?"FF2F7A4F":GOLD}};
+    });
+    const gl=4+cl.length, gt=g.getRow(gl+1);gt.getCell(4).value="Total";gt.getCell(5).value={formula:`SUM(E5:E${gl})`,result:sum(cl)};gt.getCell(5).numFmt=MF;
+    [4,5].forEach(j=>{const c=gt.getCell(j);c.font={bold:true,color:{argb:NAVY}};c.border={top:{style:"medium",color:{argb:NAVY}}};c.alignment={horizontal:"right"}});
+    g.autoFilter={from:{row:4,column:1},to:{row:gl,column:11}};
+  }
   return await wb.xlsx.writeBuffer();
 }
 
@@ -980,11 +1057,12 @@ document.querySelectorAll("#tabbar [data-go]").forEach(b=>b.addEventListener("cl
 if("IntersectionObserver" in window){
   const vis=new Map();
   const io=new IntersectionObserver(es=>{es.forEach(e=>vis.set(e.target.id,e.intersectionRatio));
-    let best=null,bv=0;["sec-new","sec-log","sec-sum"].forEach(id=>{const v=vis.get(id)||0;if(v>bv){bv=v;best=id}});
+    let best=null,bv=0;["sec-new","sec-log","sec-credit","sec-sum"].forEach(id=>{const v=vis.get(id)||0;if(v>bv){bv=v;best=id}});
     if(best)document.querySelectorAll("#tabbar [data-go]").forEach(b=>b.classList.toggle("on",b.dataset.go===best))},{threshold:[0,.15,.3,.5,.75,1]});
-  ["sec-new","sec-log","sec-sum"].forEach(id=>io.observe($(id)));
+  ["sec-new","sec-log","sec-credit","sec-sum"].forEach(id=>io.observe($(id)));
 }
 function setOutletOptions(){
+  fill($("c-outlet"),OUTLETS);$("c-outlet").closest("label").hidden=OUTLETS.length<2;
   fill($("e-outlet"),OUTLETS);fill($("f-outlet"),OUTLETS,"All outlets");
   const one=OUTLETS.length<2;
   $("f-outlet").hidden=one;$("e-outlet").closest("label").hidden=one;
@@ -1002,7 +1080,80 @@ function loadRoster(){
     rosterUnsub=rosterDoc.onSnapshot(sn=>{const p=sn.exists?sn.data().people:null;roster=Array.isArray(p)?p.map(x=>({...x})):[];rosterReady=true;$("roster").hidden=false;renderRoster()},()=>{});
   });
 }
-function applyLogRows(){rows=allRows.filter(r=>(r.log||"fc")===LOG.id)}
+function applyLogRows(){rows=allRows.filter(r=>(r.log||"fc")===LOG.id);credits=allCredits.filter(c=>(c.log||"fc")===LOG.id)}
+
+/* ---------- Guest credits ---------- */
+let allCredits=[], creditFilter="open", crPending=null;
+const digits=s=>String(s||"").replace(/\D/g,"");
+function fmtPhone(s){const d=digits(s);const t=d.length===11&&d[0]==="1"?d.slice(1):d;return t.length===10?`(${t.slice(0,3)}) ${t.slice(3,6)}-${t.slice(6)}`:String(s||"")}
+function fmtStamp(s){if(!s)return"";const d=new Date(s);return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"})+" at "+d.toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"})}
+function cstatus(msg,cls){const e=$("c-status");e.textContent=msg;e.className="status "+(cls||"")}
+function renderCredits(){
+  const open=credits.filter(c=>c.status!=="collected");
+  const owed=open.reduce((a,c)=>a+(+c.amount||0),0);
+  $("cr-total").textContent=open.length?`${open.length} open · ${money(owed)} owed`:"No open credits";
+  const q=$("c-search").value.trim().toLowerCase(), qd=digits(q);
+  let list=credits.filter(c=>creditFilter==="all"||(creditFilter==="done"?c.status==="collected":c.status!=="collected"));
+  if(q)list=list.filter(c=>String(c.guest||"").toLowerCase().includes(q)||(qd.length>=3&&(digits(c.phone).includes(qd)||digits(c.card).includes(qd)))||String(c.card||"").toLowerCase().includes(q));
+  list.sort((a,b)=>creditFilter==="done"?String(b.collectedAt).localeCompare(String(a.collectedAt)):String(b.issuedAt).localeCompare(String(a.issuedAt)));
+  const el=$("cr-list");
+  if(!db){el.innerHTML="";return}
+  if(!list.length){el.innerHTML=`<div class="note">${q?"No credits match that search.":creditFilter==="done"?"No collected credits yet.":creditFilter==="open"?"No open credits. Add one with the form above when a guest will come back.":"No guest credits yet."}</div>`;return}
+  el.innerHTML=list.map(c=>{const done=c.status==="collected";return `<article class="cr ${done?"done":"open"}">
+    <div class="cr-top"><span class="cr-name">${esc(c.guest)}</span><span class="cr-amt">${money(c.amount)}</span></div>
+    <div class="cr-meta">${esc(fmtPhone(c.phone))}${c.card?` · Player card ${esc(c.card)}`:""}</div>
+    <div>${esc(c.reason)}</div>
+    <div class="cr-meta">Issued ${esc(fmtStamp(c.issuedAt))}${c.outlet&&OUTLETS.length>1?` · ${esc(c.outlet)}`:""}${c.issuedBy?` · by ${esc(c.issuedBy)}`:""}</div>
+    <div class="cr-status">${done?`✓ COLLECTED ${esc(fmtStamp(c.collectedAt).toUpperCase())}${c.collectedBy?` · ${esc(c.collectedBy.toUpperCase())}`:""}`:"OPEN · WAITING FOR GUEST"}</div>
+    <div class="lc-acts">
+      ${done?(role==="admin"?`<button type="button" class="chip" data-cundo="${esc(c.id)}">Undo collected</button>`:"")
+           :`<button type="button" class="chip go ${crPending==="c"+c.id?"confirm":""}" data-ccollect="${esc(c.id)}">${crPending==="c"+c.id?"Tap again to confirm":"Mark collected"}</button>`}
+      ${role==="admin"?`<button type="button" class="chip danger ${crPending==="d"+c.id?"confirm":""}" data-cdel="${esc(c.id)}">${crPending==="d"+c.id?"Tap to confirm":"Delete"}</button>`:""}
+    </div>
+  </article>`}).join("");
+}
+$("c-search").addEventListener("input",renderCredits);
+document.querySelectorAll("[data-cf]").forEach(b=>b.addEventListener("click",()=>{creditFilter=b.dataset.cf;document.querySelectorAll("[data-cf]").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));renderCredits()}));
+$("c-phone").addEventListener("blur",()=>{const f=fmtPhone($("c-phone").value);if(f)$("c-phone").value=f});
+try{const m=localStorage.getItem("avl-mgr");if(m)$("c-mgr").value=m}catch(e){}
+$("cr-form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if(!db){cstatus("The log isn't connected, so this credit can't be saved.","err");return}
+  const v=id=>$(id).value.trim(), amount=parseFloat($("c-amount").value);
+  const miss=[["c-name","guest name"],["c-reason","reason"],["c-mgr","manager"]].filter(([id])=>!v(id)).map(x=>x[1]);
+  if(digits(v("c-phone")).length<10)miss.splice(1,0,"10-digit phone number");
+  if(!(amount>0))miss.push("amount");
+  if(miss.length){cstatus("Add the "+miss.join(", ")+" to save this credit.","err");return}
+  const doc={guest:v("c-name").replace(/\s+/g," "),phone:fmtPhone(v("c-phone")),card:v("c-card"),amount:Math.round(amount*100)/100,reason:v("c-reason"),outlet:v("c-outlet")||OUTLETS[0],issuedBy:v("c-mgr"),issuedAt:nowLocal(),createdAt:new Date().toISOString(),status:"open",log:LOG.id};
+  $("c-save").disabled=true;
+  try{
+    await db.collection("credits").doc().set(doc);
+    try{localStorage.setItem("avl-mgr",doc.issuedBy)}catch(e){}
+    ["c-name","c-phone","c-card","c-amount","c-reason"].forEach(id=>$(id).value="");
+    cstatus(`Saved ${money(doc.amount)} credit for ${doc.guest}.`,"ok");
+    if(creditFilter==="done"){creditFilter="open";document.querySelectorAll("[data-cf]").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.cf==="open")))}
+  }catch(err){
+    cstatus(err&&err.code==="permission-denied"?"The database refused this credit. Add the credits rule in Firebase (see the setup guide).":"Couldn't save the credit. Check your connection and try again.","err");
+  }finally{$("c-save").disabled=false}
+});
+$("cr-list").addEventListener("click",async e=>{
+  const b=e.target.closest("[data-ccollect],[data-cdel],[data-cundo]");if(!b)return;
+  const id=b.dataset.ccollect||b.dataset.cdel||b.dataset.cundo;
+  const ref=db.collection("credits").doc(id);
+  try{
+    if(b.dataset.cundo){await ref.update({status:"open",collectedAt:"",collectedBy:""});cstatus("Marked as open again.","ok");return}
+    const key=(b.dataset.ccollect?"c":"d")+id;
+    if(crPending!==key){crPending=key;renderCredits();setTimeout(()=>{if(crPending===key){crPending=null;renderCredits()}},4000);return}
+    crPending=null;
+    if(b.dataset.cdel){await ref.delete();cstatus("Credit deleted.","ok");return}
+    const mgr=$("c-mgr").value.trim();
+    if(!mgr){renderCredits();cstatus("Type your name in Manager above, then mark it collected.","err");$("c-mgr").focus();return}
+    const c=credits.find(x=>x.id===id);
+    await ref.update({status:"collected",collectedAt:nowLocal(),collectedBy:mgr});
+    try{localStorage.setItem("avl-mgr",mgr)}catch(e){}
+    cstatus(`${c?c.guest+"'s ":""}${c?money(c.amount)+" ":""}credit marked collected.`,"ok");
+  }catch(err){renderCredits();cstatus(err&&err.code==="permission-denied"?"The database refused the change. Add the credits rule in Firebase (see the setup guide).":"Couldn't update the credit. Try again.","err")}
+});
 function switchLog(id){
   const next=allowedLogs.find(l=>l.id===id)||allowedLogs[0];
   LOG=next;OUTLETS=LOG.outlets;
@@ -1012,8 +1163,8 @@ function switchLog(id){
   document.querySelectorAll("#log-switch button").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.log===LOG.id)));
   if(editingId)cancelEdit();
   setOutletOptions();$("f-outlet").value="";
-  applyLogRows();buildRange();render();loadRoster();
-  $("r-search").value="";status("");
+  applyLogRows();buildRange();render();renderCredits();loadRoster();
+  $("r-search").value="";$("c-search").value="";status("");cstatus("");
 }
 function buildLogSwitch(){
   const sw=$("log-switch");
@@ -1032,6 +1183,7 @@ function start(){
   let want=null;try{want=localStorage.getItem("avl-log")}catch(e){}
   switchLog(allowedLogs.some(l=>l.id===want)?want:allowedLogs[0].id);
   db.collection("adjustments").onSnapshot(s=>{allRows=s.docs.map(x=>({id:x.id,...x.data()}));applyLogRows();buildRange();render()},()=>{db=null;render();status("Lost connection to the log. Reload the page.","err")});
+  db.collection("credits").onSnapshot(s=>{allCredits=s.docs.map(x=>({id:x.id,...x.data()}));applyLogRows();renderCredits()},()=>{$("cr-list").innerHTML=`<div class="note">Guest credits aren't available yet. Add the credits rule in Firebase (see the setup guide).</div>`});
 }
 $("sign-out").addEventListener("click",()=>{try{localStorage.removeItem("avl-pass")}catch(e){}location.reload()});
 $("lock-form").addEventListener("submit",async e=>{

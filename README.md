@@ -20,7 +20,7 @@ Everything runs on free tiers except the photo reading, which is billed per rece
 1. Go to [console.firebase.google.com](https://console.firebase.google.com) and click **Create a project**. Name it something like `adjust-void-log`. Google Analytics isn't needed.
 2. In the left menu, go to **Build > Firestore Database** and click **Create database**. Pick a US location and start in **production mode**.
 3. Open the **Rules** tab and add the rules from `firestore.rules`, then click **Publish**.
-   - **If this Firebase project already runs another app** (this one shares the `soft-skills-f6ae0` project), do **not** replace the existing rules. Copy only the `match /adjustments`, `match /photos` and `match /roster` blocks and paste them inside the existing `match /databases/{database}/documents { ... }` section, next to the rules that are already there.
+   - **If this Firebase project already runs another app** (this one shares the `soft-skills-f6ae0` project), do **not** replace the existing rules. Copy only the `match /adjustments`, `match /photos`, `match /credits` and `match /roster` blocks and paste them inside the existing `match /databases/{database}/documents { ... }` section, next to the rules that are already there.
 4. Go to **Project settings** (gear icon) **> General**. Under **Your apps**, click the **</>** web icon, register an app (no hosting needed), and copy the `firebaseConfig` values into the `firebase` section of `config.js`.
 
 ### 2. GitHub Pages
@@ -55,6 +55,12 @@ As admin, open **Team roster** and click **Import from Excel**. Choose `Cashiers
 7. Put that URL in `photoReaderUrl` in `config.js` and commit.
 
 Cloudflare's free plan allows 100,000 requests a day, far more than the log needs.
+
+## Guest credits
+
+The **Guest credits** section (the Credits tab on phones) tracks money owed to a guest who will come back later: guest name, phone, player card (optional), amount, reason, outlet and the issuing manager. When the guest returns, find them by name, phone or player card and tap **Mark collected** twice; the app stamps the date, time and the manager's name. Admin can undo or delete. Each restaurant keeps its own credits, and the Excel report adds a **Guest Credits** tab for credits issued in the selected period.
+
+Guest phone numbers are stored in the same Firebase database as the log, so keep the app link and repo limited to your team.
 
 ## Other restaurants
 

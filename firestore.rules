@@ -22,6 +22,18 @@ service cloud.firestore {
       allow delete: if true;
     }
 
+    // Guest credits: one record per credit owed to a returning guest.
+    match /credits/{id} {
+      allow read: if true;
+      allow create, update: if request.resource.data.keys().hasAll(['guest', 'phone', 'amount', 'status'])
+                            && request.resource.data.amount is number
+                            && request.resource.data.amount > 0
+                            && request.resource.data.amount < 10000
+                            && request.resource.data.status in ['open', 'collected']
+                            && request.resource.data.size() <= 20;
+      allow delete: if true;
+    }
+
     // Team roster: stored under an id derived from the admin passcode.
     // It can only be opened by someone who knows that id, and it can never be listed or deleted.
     match /roster/{id} {
